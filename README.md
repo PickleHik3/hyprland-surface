@@ -1,33 +1,32 @@
 # hyprland-surface
 
-Live backup + setup guide for this Surface/Hyprland tablet workflow.
+Live backup + reproducible setup notes for this Surface tablet Hyprland workflow.
 
-This repo stores only the active pieces used on the machine:
-- Hyprland config (with custom gesture hooks and script paths)
-- Fcitx5 env + virtual keyboard adapter config
-- Custom `wvkbd` scripts/binary workspace
-- `qs-hyprview` user service snapshot
-- SDDM theme/config snapshots
+This repo intentionally contains only active, local customizations:
+- `hypr/hyprland.conf`
+- `environment.d/10-fcitx.conf`
+- `fcitx5/conf/virtualkeyboardadapter.conf`
+- `wvkbd-custom/`
+- `systemd-user/qs-hyprview.service`
+- `sddm/` snapshots
 
-Notes:
-- DMS shell config files are intentionally **not** shipped here.
-- `qs-hyprview` fork is expected as a sibling directory: `~/Documents/hyprland-tablet-backup/qs-hyprview`.
+DMS shell configs are intentionally not included.
 
-## 1. Base OS
+## 1. Install base OS (no DE)
 
-Install EndeavourOS **without** a desktop environment:
+Install EndeavourOS without a desktop environment:
 - https://endeavouros.com/
 
-Boot into TTY after install.
+Reboot and log in to TTY.
 
-## 2. Linux Surface kernel
+## 2. Install linux-surface kernel
 
-Install linux-surface kernel and components by following the official guide:
+Follow the official instructions exactly:
 - https://github.com/linux-surface/linux-surface
 
-Reboot into the linux-surface kernel when done.
+Reboot into linux-surface kernel.
 
-## 3. Install SDDM + keyboard/display stack
+## 3. Install core packages
 
 ```bash
 sudo pacman -S --needed \
@@ -56,35 +55,38 @@ cmake --build . -j"$(nproc)"
 sudo cmake --install .
 ```
 
-## 5. Install DMS shell (official one-liner)
+## 5. Install DMS shell
 
-Run the official installer exactly from:
+Use the official installer from:
 - https://danklinux.com/
 
-Do not replace this with a copied command here; use the current one-liner from the website.
+## 6. Hyprgrass prerequisite + official setup
 
-## 6. Install Hyprgrass
-
-Use Hyprland plugin manager:
+Before installing/configuring Hyprgrass, update Hyprland plugins:
 
 ```bash
-hyprpm add https://github.com/horriblename/hyprgrass
-hyprpm enable hyprgrass
+hyprpm update
 ```
 
-## 7. Clone backup + fork layout
+Then follow the official Hyprgrass repo instructions:
+- https://github.com/horriblename/hyprgrass
 
-Use this directory layout:
+## 7. Clone repos (any location)
 
-```text
-~/Documents/hyprland-tablet-backup/
-  hyprland-surface/   # this repo
-  qs-hyprview/        # your fork repo
-```
+You can clone these repos anywhere.
 
-## 8. Copy configs from this repo
+- `hyprland-surface` (this repo)
+- `qs-hyprview` (your fork)
 
-From `hyprland-surface` repo root:
+Only one path is critical at runtime: the local path to `qs-hyprview` used by:
+- `systemd-user/qs-hyprview.service` (`ExecStart`)
+- `hypr/hyprland.conf` gesture IPC command (`quickshell ipc -p ...`)
+
+If you use non-default paths, update these files before copying to live config.
+
+## 8. Copy config files
+
+From this repo root:
 
 ```bash
 # Hyprland
@@ -110,22 +112,15 @@ sudo cp sddm/metadata.desktop /usr/share/sddm/themes/silent/metadata.desktop
 sudo cp sddm/catppuccin-mocha-tablet.conf /usr/share/sddm/themes/silent/configs/catppuccin-mocha-tablet.conf
 ```
 
-## 9. Apply + enable services
+## 9. Apply and reload
 
 ```bash
-# User services
 systemctl --user daemon-reload
 systemctl --user enable --now qs-hyprview.service
 
-# Ensure env vars are imported in current session too
 systemctl --user import-environment QT_IM_MODULE XMODIFIERS
-
-# Start IM + keyboard once now
 pkill -x fcitx5 || true
 fcitx5 -dr
-~/Documents/hyprland-tablet-backup/hyprland-surface/wvkbd-custom/scripts/start-wvkbd.sh
-
-# Reload Hyprland after config copy
 hyprctl reload
 ```
 
@@ -138,14 +133,7 @@ hyprctl binds | rg -n 'hyprgrass|expose|wvkbd'
 ```
 
 Expected:
-- `qs-hyprview.service` running from `~/Documents/hyprland-tablet-backup/qs-hyprview`
-- `fcitx5` running
-- `wvkbd-deskintl-custom` running (hidden)
-- Hyprgrass edge gestures loaded
-
-## 11. Update workflow
-
-- Edit files in this repo.
-- Copy changed files to live paths.
-- Reload Hyprland / restart user services as needed.
-- Keep `qs-hyprview` fork updated separately in its own repo.
+- `qs-hyprview.service` active
+- `fcitx5` active
+- `wvkbd-deskintl-custom` active
+- Hyprgrass binds loaded

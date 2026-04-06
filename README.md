@@ -2,8 +2,6 @@
 
 This repo is the part of my Surface Pro 7 setup that makes Hyprland usable as a touch-first desktop.
 
-It is a backup of the files I actually use on my live machine, not a full dotfiles repo. DMS shell files are not included here.
-
 ## What is in this repo
 
 - `hypr/hyprland.conf`: Hyprland config with Hyprgrass touch gestures
@@ -19,7 +17,6 @@ It is a backup of the files I actually use on my live machine, not a full dotfil
 - runs Hyprland with touch gestures through Hyprgrass
 - uses `fcitx5` plus a patched `wvkbd` for the on-screen keyboard
 - starts `qs-hyprview` as a Quickshell overview
-- leaves DMS shell as a separate install
 
 ## Before you start
 
@@ -81,8 +78,6 @@ This is what lets Fcitx5 call the show and hide scripts for `wvkbd`.
 Install DMS from its official source:
 
 - https://danklinux.com/
-
-This repo assumes DMS is already working, but it does not ship DMS config files.
 
 ## 6. Install Hyprgrass
 

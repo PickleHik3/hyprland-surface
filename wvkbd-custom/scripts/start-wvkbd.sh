@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="/home/amalv/Documents/hyprland-tablet-backup/hyprland-surface/wvkbd-custom"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 BIN="$ROOT/bin/wvkbd-deskintl-custom"
 
 if pgrep -f "$BIN" >/dev/null; then

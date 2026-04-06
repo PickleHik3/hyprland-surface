@@ -102,11 +102,11 @@ Then follow the Hyprgrass instructions:
 
 ## 8. Clone both repos
 
-The easiest option is to use the same default location I use, because the configs and scripts in this repo already point to it:
+The easiest option is to use the default location already used by the shipped config files and scripts:
 
 ```bash
-mkdir -p ~/Documents/hyprland-tablet-backup
-cd ~/Documents/hyprland-tablet-backup
+mkdir -p ~/.local/src/hyprland-tablet
+cd ~/.local/src/hyprland-tablet
 git clone https://github.com/PickleHik3/hyprland-surface.git
 git clone https://github.com/PickleHik3/qs-hyprview.git
 ```

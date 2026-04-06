@@ -3,9 +3,10 @@ set -euo pipefail
 
 STATE_DIR="/run/user/${UID}/wvkbd-custom"
 DISABLED_FLAG="${STATE_DIR}/disabled"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 mkdir -p "${STATE_DIR}"
 rm -f "${DISABLED_FLAG}"
 
 # Re-enable automatic behavior and force-show now.
-/home/amalv/Documents/hyprland-tablet-backup/hyprland-surface/wvkbd-custom/scripts/show-wvkbd.sh
+"${SCRIPT_DIR}/show-wvkbd.sh"

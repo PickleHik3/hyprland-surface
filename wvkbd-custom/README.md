@@ -19,14 +19,14 @@ Patched `wvkbd-deskintl` source and runnable scripts for Hyprland/fcitx5.
 ## Build
 
 ```bash
-cd /home/amalv/Documents/hyprland-tablet-backup/hyprland-surface/wvkbd-custom
+cd ~/.local/src/hyprland-tablet/hyprland-surface/wvkbd-custom
 ./build-custom.sh
 ```
 
 ## Runtime scripts
 
 ```bash
-/home/amalv/Documents/hyprland-tablet-backup/hyprland-surface/wvkbd-custom/scripts/start-wvkbd.sh
-/home/amalv/Documents/hyprland-tablet-backup/hyprland-surface/wvkbd-custom/scripts/show-wvkbd.sh
-/home/amalv/Documents/hyprland-tablet-backup/hyprland-surface/wvkbd-custom/scripts/hide-wvkbd.sh
+~/.local/src/hyprland-tablet/hyprland-surface/wvkbd-custom/scripts/start-wvkbd.sh
+~/.local/src/hyprland-tablet/hyprland-surface/wvkbd-custom/scripts/show-wvkbd.sh
+~/.local/src/hyprland-tablet/hyprland-surface/wvkbd-custom/scripts/hide-wvkbd.sh
 ```

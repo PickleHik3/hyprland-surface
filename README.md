@@ -48,8 +48,7 @@ Reboot once the kernel is installed and make sure you are using it.
 sudo pacman -S --needed \
   sddm qt5-virtualkeyboard \
   hyprland hyprpolkitagent xdg-desktop-portal-hyprland gnome-keyring \
-  fcitx5 fcitx5-gtk fcitx5-qt fcitx5-configtool \
-  iio-sensor-proxy
+  fcitx5 fcitx5-gtk fcitx5-qt fcitx5-configtool
 ```
 
 Then enable the display manager:
@@ -58,7 +57,17 @@ Then enable the display manager:
 sudo systemctl enable sddm
 ```
 
-## 4. Install the Fcitx virtual keyboard adapter
+## 4. Install `iio-hyprland` from the AUR
+
+This setup uses `iio-hyprland` for automatic screen rotation.
+
+Install it with your preferred AUR helper, for example:
+
+```bash
+yay -S iio-hyprland
+```
+
+## 5. Install the Fcitx virtual keyboard adapter
 
 ```bash
 cd ~
@@ -73,13 +82,13 @@ sudo cmake --install .
 
 This is what lets Fcitx5 call the show and hide scripts for `wvkbd`.
 
-## 5. Install DMS shell
+## 6. Install DMS shell
 
 Install DMS from its official source:
 
 - https://danklinux.com/
 
-## 6. Install Hyprgrass
+## 7. Install Hyprgrass
 
 First update Hyprland plugins:
 
@@ -91,7 +100,7 @@ Then follow the Hyprgrass instructions:
 
 - https://github.com/horriblename/hyprgrass
 
-## 7. Clone both repos
+## 8. Clone both repos
 
 Clone these wherever you want:
 
@@ -111,7 +120,7 @@ The path to `wvkbd-custom` is used in:
 - `fcitx5/conf/virtualkeyboardadapter.conf`
 - every script under `wvkbd-custom/scripts/`
 
-## 8. Copy the config files into place
+## 9. Copy the config files into place
 
 Run these commands from this repo:
 
@@ -134,7 +143,7 @@ sudo cp sddm/metadata.desktop /usr/share/sddm/themes/silent/metadata.desktop
 sudo cp sddm/catppuccin-mocha-tablet.conf /usr/share/sddm/themes/silent/configs/catppuccin-mocha-tablet.conf
 ```
 
-## 9. Reload everything
+## 10. Reload everything
 
 ```bash
 systemctl --user daemon-reload
@@ -146,7 +155,7 @@ fcitx5 -dr
 hyprctl reload
 ```
 
-## 10. Check that it works
+## 11. Check that it works
 
 ```bash
 systemctl --user status qs-hyprview.service --no-pager
@@ -160,6 +169,18 @@ You should see:
 - `fcitx5` running
 - `wvkbd-deskintl-custom` running
 - Hyprgrass bindings loaded
+
+## Touch gestures
+
+These are the Hyprgrass gestures currently configured in `hypr/hyprland.conf`:
+
+- bottom edge swipe up: open `qs-hyprview`
+- left edge swipe down: close the active window
+- right edge swipe down: open the DMS app drawer
+- top edge swipe right: re-enable automatic keyboard behavior and show the keyboard now
+- top edge swipe left: disable the keyboard
+- two-finger long press: move the current window
+- three-finger long press: resize the current floating window
 
 ## Notes
 

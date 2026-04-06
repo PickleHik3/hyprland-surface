@@ -1,0 +1,6 @@
+# local build outputs
+wvkbd-custom/build/
+
+# editor/system noise
+.DS_Store
+*.swp

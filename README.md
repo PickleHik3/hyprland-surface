@@ -102,12 +102,18 @@ Then follow the Hyprgrass instructions:
 
 ## 8. Clone both repos
 
-Clone these wherever you want:
+The easiest option is to use the same default location I use, because the configs and scripts in this repo already point to it:
 
-- `hyprland-surface`
-- `qs-hyprview`
+```bash
+mkdir -p ~/Documents/hyprland-tablet-backup
+cd ~/Documents/hyprland-tablet-backup
+git clone https://github.com/PickleHik3/hyprland-surface.git
+git clone https://github.com/PickleHik3/qs-hyprview.git
+```
 
-Important: this repo contains absolute paths. If you do not keep the same paths I use, you must edit them before copying anything into `~/.config`.
+If you use this location, you do not need to edit any paths before copying the files into `~/.config`.
+
+If you choose a different location, you must update the absolute paths first.
 
 The path to `qs-hyprview` is used in:
 

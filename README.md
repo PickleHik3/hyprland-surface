@@ -12,12 +12,17 @@ Clone these into `~/.config/hypr/apps`:
 - `qs-hyprview`: `https://github.com/PickleHik3/qs-hyprview`
 - `surface-noctalia`: `https://github.com/PickleHik3/surface-noctalia`
 
-This repo only keeps the extra config files that do not belong in those repos:
+This repo only keeps the guide and the optional `sddm/` files.
 
-- `environment.d/10-fcitx.conf`
-- `fcitx5/conf/virtualkeyboardadapter.conf`
-- `systemd-user/qs-hyprview.service`
-- `sddm/`
+The app-specific integration files now live in their own repos:
+
+- `wvkbd`
+  - `integration/environment.d/10-fcitx.conf`
+  - `integration/fcitx5/conf/virtualkeyboardadapter.conf`
+- `qs-hyprview`
+  - `systemd-user/qs-hyprview.service`
+- `surface-noctalia`
+  - Noctalia plugin repository and plugin files
 
 ## What you get
 
@@ -84,19 +89,17 @@ cd ~/.config/hypr/apps/wvkbd
 ./build-custom.sh
 ```
 
-## 4. Copy the config files from this repo
-
-Run these commands from this repo:
+## 4. Install the integration files from each repo
 
 ```bash
 mkdir -p ~/.config/environment.d
-cp environment.d/10-fcitx.conf ~/.config/environment.d/10-fcitx.conf
+cp ~/.config/hypr/apps/wvkbd/integration/environment.d/10-fcitx.conf ~/.config/environment.d/10-fcitx.conf
 
 mkdir -p ~/.config/fcitx5/conf
-cp fcitx5/conf/virtualkeyboardadapter.conf ~/.config/fcitx5/conf/virtualkeyboardadapter.conf
+cp ~/.config/hypr/apps/wvkbd/integration/fcitx5/conf/virtualkeyboardadapter.conf ~/.config/fcitx5/conf/virtualkeyboardadapter.conf
 
 mkdir -p ~/.config/systemd/user
-cp systemd-user/qs-hyprview.service ~/.config/systemd/user/qs-hyprview.service
+cp ~/.config/hypr/apps/qs-hyprview/systemd-user/qs-hyprview.service ~/.config/systemd/user/qs-hyprview.service
 
 sudo install -d -m 0755 /usr/share/sddm/themes/silent/configs
 sudo cp sddm/sddm.conf /etc/sddm.conf

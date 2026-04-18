@@ -1,73 +1,59 @@
 # hyprland-surface
 
-This repo is the part of my Surface Pro 7 setup that makes Hyprland usable as a touch-first desktop.
+Guide repo for rebuilding the Surface Pro 7 Hyprland setup from the split repositories.
 
-## What is in this repo
+This repo is the guide and glue layer. The app code lives elsewhere.
 
-- `hypr/hyprland.conf`: Hyprland config with Hyprgrass touch gestures
-- `environment.d/10-fcitx.conf`: input method environment variables
-- `fcitx5/conf/virtualkeyboardadapter.conf`: tells Fcitx5 how to show and hide the keyboard
-- `wvkbd-custom/`: patched `wvkbd-deskintl` build and helper scripts
-- `systemd-user/qs-hyprview.service`: starts the Quickshell overview
-- `sddm/`: SDDM theme files I use on this tablet
+## Repos
 
-## What this setup does
+Clone these into `~/.config/hypr/apps`:
 
-- uses `linux-surface` so the Surface hardware works properly
-- runs Hyprland with touch gestures through Hyprgrass
-- uses `fcitx5` plus a patched `wvkbd` for the on-screen keyboard
-- starts `qs-hyprview` as a Quickshell overview
+- `wvkbd`: `https://github.com/PickleHik3/wvkbd`
+- `qs-hyprview`: `https://github.com/PickleHik3/qs-hyprview`
+- `surface-noctalia`: `https://github.com/PickleHik3/surface-noctalia`
 
-## Before you start
+This repo only keeps the extra config files that do not belong in those repos:
 
-This was built on EndeavourOS, which is Arch-based. The current live machine is a Microsoft Surface Pro 7 with:
+- `environment.d/10-fcitx.conf`
+- `fcitx5/conf/virtualkeyboardadapter.conf`
+- `systemd-user/qs-hyprview.service`
+- `sddm/`
 
-- Intel i5
-- 8 GB RAM
-- 128 GB storage
+## What you get
 
-You can use plain Arch if you prefer, but the package steps below assume an Arch-based system.
+- Hyprland on a Surface device
+- Noctalia Shell
+- `qs-hyprview` recent apps / overview
+- custom `wvkbd`
+- optional Noctalia bar plugin for keyboard and recent apps
+- `fcitx5` virtual keyboard adapter
+- `iio-hyprland`
 
-## 1. Install the base system
+## 1. Base system
 
-Install EndeavourOS without a desktop environment, then boot into a TTY.
+1. Install an Arch-based system.
+2. Install the `linux-surface` kernel:
+   `https://github.com/linux-surface/linux-surface`
+3. Reboot into the Surface kernel.
 
-- https://endeavouros.com/
-
-## 2. Install the `linux-surface` kernel
-
-Follow the official guide:
-
-- https://github.com/linux-surface/linux-surface
-
-Reboot once the kernel is installed and make sure you are using it.
-
-## 3. Install the main packages
+## 2. Packages
 
 ```bash
 sudo pacman -S --needed \
   sddm qt5-virtualkeyboard \
   hyprland hyprpolkitagent xdg-desktop-portal-hyprland gnome-keyring \
-  fcitx5 fcitx5-gtk fcitx5-qt fcitx5-configtool
+  fcitx5 fcitx5-gtk fcitx5-qt fcitx5-configtool \
+  quickshell git
 ```
 
-Then enable the display manager:
+Also install:
 
-```bash
-sudo systemctl enable sddm
-```
+- `iio-hyprland` from the AUR
+- `hyprgrass` using its upstream instructions
+- Noctalia Shell using the official install docs:
+  `https://docs.noctalia.dev/getting-started/installation/`
 
-## 4. Install `iio-hyprland` from the AUR
-
-This setup uses `iio-hyprland` for automatic screen rotation.
-
-Install it with your preferred AUR helper, for example:
-
-```bash
-yay -S iio-hyprland
-```
-
-## 5. Install the Fcitx virtual keyboard adapter
+Install the Fcitx virtual keyboard adapter:
 
 ```bash
 cd ~
@@ -80,60 +66,29 @@ cmake --build . -j"$(nproc)"
 sudo cmake --install .
 ```
 
-This is what lets Fcitx5 call the show and hide scripts for `wvkbd`.
-
-## 6. Install DMS shell
-
-Install DMS from its official source:
-
-- https://danklinux.com/
-
-## 7. Install Hyprgrass
-
-First update Hyprland plugins:
+## 3. Clone the repos
 
 ```bash
-hyprpm update
-```
+mkdir -p ~/.config/hypr/apps
+cd ~/.config/hypr/apps
 
-Then follow the Hyprgrass instructions:
-
-- https://github.com/horriblename/hyprgrass
-
-## 8. Clone both repos
-
-The easiest option is to use the default location already used by the shipped config files and scripts:
-
-```bash
-mkdir -p ~/.local/src/hyprland-tablet
-cd ~/.local/src/hyprland-tablet
-git clone https://github.com/PickleHik3/hyprland-surface.git
+git clone https://github.com/PickleHik3/wvkbd.git
 git clone https://github.com/PickleHik3/qs-hyprview.git
+git clone https://github.com/PickleHik3/surface-noctalia.git
 ```
 
-If you use this location, you do not need to edit any paths before copying the files into `~/.config`.
+Build `wvkbd`:
 
-If you choose a different location, you must update the absolute paths first.
+```bash
+cd ~/.config/hypr/apps/wvkbd
+./build-custom.sh
+```
 
-The path to `qs-hyprview` is used in:
-
-- `systemd-user/qs-hyprview.service`
-- `hypr/hyprland.conf`
-
-The path to `wvkbd-custom` is used in:
-
-- `hypr/hyprland.conf`
-- `fcitx5/conf/virtualkeyboardadapter.conf`
-- every script under `wvkbd-custom/scripts/`
-
-## 9. Copy the config files into place
+## 4. Copy the config files from this repo
 
 Run these commands from this repo:
 
 ```bash
-mkdir -p ~/.config/hypr
-cp hypr/hyprland.conf ~/.config/hypr/hyprland.conf
-
 mkdir -p ~/.config/environment.d
 cp environment.d/10-fcitx.conf ~/.config/environment.d/10-fcitx.conf
 
@@ -149,47 +104,88 @@ sudo cp sddm/metadata.desktop /usr/share/sddm/themes/silent/metadata.desktop
 sudo cp sddm/catppuccin-mocha-tablet.conf /usr/share/sddm/themes/silent/configs/catppuccin-mocha-tablet.conf
 ```
 
-## 10. Reload everything
+Enable the user service:
 
 ```bash
 systemctl --user daemon-reload
 systemctl --user enable --now qs-hyprview.service
-
-systemctl --user import-environment QT_IM_MODULE XMODIFIERS
-pkill -x fcitx5 || true
-fcitx5 -dr
-hyprctl reload
 ```
 
-## 11. Check that it works
+## 5. Add the Hyprland lines you need
+
+Do not copy a full `hyprland.conf` from here. Add these pieces to your own config.
+
+Startup:
+
+```ini
+exec-once = qs -c noctalia-shell --no-duplicate
+exec-once = systemctl --user start hyprland-session.target
+exec-once = uwsm-app -- ~/.config/hypr/apps/wvkbd/scripts/start-wvkbd.sh
+exec-once = uwsm-app -- iio-hyprland
+```
+
+Hyprgrass:
+
+```ini
+plugin {
+    touch_gestures {
+        workspace_swipe_fingers = 3
+        workspace_swipe_edge = d
+        edge_margin = 10
+
+        hyprgrass-bind = , edge:d:u, exec, quickshell ipc -p $HOME/.config/hypr/apps/qs-hyprview call expose open smartgrid
+        hyprgrass-bind = , edge:l:d, killactive
+        hyprgrass-bind = , edge:u:r, exec, $HOME/.config/hypr/apps/wvkbd/scripts/auto-show-wvkbd.sh
+        hyprgrass-bind = , edge:u:l, exec, $HOME/.config/hypr/apps/wvkbd/scripts/disable-wvkbd.sh
+        hyprgrass-bindm = , longpress:2, movewindow
+        hyprgrass-bindm = , longpress:3, resizewindow
+    }
+}
+```
+
+## 6. Install the Noctalia plugin
+
+Noctalia already supports custom plugin repositories through its GUI.
+
+In the Plugins section, add this repository:
+
+- `https://github.com/PickleHik3/surface-noctalia`
+
+Then install:
+
+- `Surface Tablet Controls`
+
+That plugin gives you:
+
+- a recent-apps button for `qs-hyprview`
+- keyboard actions for `wvkbd`: auto, show, hide, disable
+
+Official Noctalia plugin docs:
+
+- `https://docs.noctalia.dev/plugins/overview/`
+- `https://docs.noctalia.dev/development/plugins/getting-started/`
+
+## 7. Optional: Noctalia theming for `wvkbd`
+
+Enable Noctalia user templates, then use the `wvkbd` template shipped in the `wvkbd` repo.
+
+The live path layout is:
+
+- `~/.config/noctalia/user-templates.toml`
+- `~/.config/noctalia/templates/wvkbd-theme.sh`
+- `~/.config/hypr/apps/wvkbd/generated/noctalia-theme.sh`
+
+## 8. Verify
 
 ```bash
 systemctl --user status qs-hyprview.service --no-pager
 pgrep -af 'fcitx5|wvkbd-deskintl-custom|quickshell'
-hyprctl binds | rg -n 'hyprgrass|expose|wvkbd'
+hyprctl binds | rg -n 'hyprgrass|qs-hyprview|wvkbd'
 ```
 
-You should see:
+Expected result:
 
-- `qs-hyprview.service` running
-- `fcitx5` running
-- `wvkbd-deskintl-custom` running
-- Hyprgrass bindings loaded
-
-## Touch gestures
-
-These are the Hyprgrass gestures currently configured in `hypr/hyprland.conf`:
-
-- bottom edge swipe up: open `qs-hyprview`
-- left edge swipe down: close the active window
-- right edge swipe down: open the DMS app drawer
-- top edge swipe right: re-enable automatic keyboard behavior and show the keyboard now
-- top edge swipe left: disable the keyboard
-- two-finger long press: move the current window
-- three-finger long press: resize the current floating window
-
-## Notes
-
-- The current `hyprland.conf` expects DMS config files under `~/.config/hypr/dms/`.
-- Screen rotation is handled by `iio-hyprland`.
-- The on-screen keyboard starts hidden, then shows and hides through the Fcitx5 adapter and the helper scripts in `wvkbd-custom/scripts/`.
+- `qs-hyprview.service` is running
+- `fcitx5` is running
+- `wvkbd-deskintl-custom` is running
+- the Hyprgrass bindings are present

@@ -5,7 +5,7 @@ After=hyprland-session.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/quickshell -p %h/.local/src/hyprland-tablet/qs-hyprview
+ExecStart=/usr/bin/quickshell -p %h/.config/hypr/apps/qs-hyprview
 Restart=on-failure
 RestartSec=1
 

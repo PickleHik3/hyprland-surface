@@ -1,36 +1,33 @@
 # hyprland-surface
 
-Guide repo for rebuilding the Surface Pro 7 Hyprland setup from the split repositories.
+Guide repo for rebuilding the Surface Pro 7 Hyprland setup from the split
+repositories.
 
 This repo is the guide and glue layer. The app code lives elsewhere.
 
 ## Repos
 
-Clone these into `~/.config/hypr/apps`:
+Clone these repos into their default live paths:
 
 - `wvkbd`: `https://github.com/PickleHik3/wvkbd`
 - `qs-hyprview`: `https://github.com/PickleHik3/qs-hyprview`
-- `surface-noctalia`: `https://github.com/PickleHik3/surface-noctalia`
+- `surface-dms`: `https://github.com/PickleHik3/surface-dms`
+
+Default live paths:
+
+- `wvkbd`: `~/.config/hypr/apps/wvkbd`
+- `qs-hyprview`: `~/.config/hypr/apps/qs-hyprview`
+- `surface-dms`: `~/.config/DankMaterialShell/plugins/surface-dms`
 
 This repo only keeps the guide and the optional `sddm/` files.
-
-The app-specific integration files now live in their own repos:
-
-- `wvkbd`
-  - `integration/environment.d/10-fcitx.conf`
-  - `integration/fcitx5/conf/virtualkeyboardadapter.conf`
-- `qs-hyprview`
-  - `systemd-user/qs-hyprview.service`
-- `surface-noctalia`
-  - Noctalia plugin repository and plugin files
 
 ## What you get
 
 - Hyprland on a Surface device
-- Noctalia Shell
+- Dank Material Shell
 - `qs-hyprview` recent apps / overview
 - custom `wvkbd`
-- optional Noctalia bar plugin for keyboard and recent apps
+- optional DMS bar widgets for recent apps, keyboard toggle, and back
 - `fcitx5` virtual keyboard adapter
 - `iio-hyprland`
 
@@ -48,15 +45,19 @@ sudo pacman -S --needed \
   sddm qt5-virtualkeyboard \
   hyprland hyprpolkitagent xdg-desktop-portal-hyprland gnome-keyring \
   fcitx5 fcitx5-gtk fcitx5-qt fcitx5-configtool \
-  quickshell git
+  quickshell jq git
 ```
 
 Also install:
 
+- `dms-shell`
 - `iio-hyprland` from the AUR
 - `hyprgrass` using its upstream instructions
-- Noctalia Shell using the official install docs:
-  `https://docs.noctalia.dev/getting-started/installation/`
+
+Install Dank Material Shell using the official docs:
+
+- `https://danklinux.com/docs/dankmaterialshell/installation/`
+- `https://danklinux.com/docs/dankmaterialshell/compositors/`
 
 Install the Fcitx virtual keyboard adapter:
 
@@ -75,11 +76,11 @@ sudo cmake --install .
 
 ```bash
 mkdir -p ~/.config/hypr/apps
-cd ~/.config/hypr/apps
+git clone https://github.com/PickleHik3/wvkbd.git ~/.config/hypr/apps/wvkbd
+git clone https://github.com/PickleHik3/qs-hyprview.git ~/.config/hypr/apps/qs-hyprview
 
-git clone https://github.com/PickleHik3/wvkbd.git
-git clone https://github.com/PickleHik3/qs-hyprview.git
-git clone https://github.com/PickleHik3/surface-noctalia.git
+mkdir -p ~/.config/DankMaterialShell/plugins
+git clone https://github.com/PickleHik3/surface-dms.git ~/.config/DankMaterialShell/plugins/surface-dms
 ```
 
 Build `wvkbd`:
@@ -116,12 +117,13 @@ systemctl --user enable --now qs-hyprview.service
 
 ## 5. Add the Hyprland lines you need
 
-Do not copy a full `hyprland.conf` from here. Add these pieces to your own config.
+Do not copy a full `hyprland.conf` from here. Add these pieces to your own
+config.
 
 Startup:
 
 ```ini
-exec-once = qs -c noctalia-shell --no-duplicate
+exec-once = dms run
 exec-once = systemctl --user start hyprland-session.target
 exec-once = uwsm-app -- ~/.config/hypr/apps/wvkbd/scripts/start-wvkbd.sh
 exec-once = uwsm-app -- iio-hyprland
@@ -146,44 +148,41 @@ plugin {
 }
 ```
 
-## 6. Install the Noctalia plugin
+## 6. Enable the DMS plugin
 
-Noctalia already supports custom plugin repositories through its GUI.
+1. Open DMS Settings.
+2. Go to `Plugins`.
+3. Click `Scan for Plugins`.
+4. Enable `Surface Tablet Controls`.
+5. Open the plugin settings page.
+6. Click `Create Missing Default Variants`.
+7. Go to DankBar settings and add the items you want:
+   - `Recent Apps`
+   - `Keyboard Toggle`
+   - `Back`
+8. Restart the shell with `dms restart`.
 
-In the Plugins section, add this repository:
+The plugin can also still be added as one grouped widget if you want the old
+combined layout.
 
-- `https://github.com/PickleHik3/surface-noctalia`
+Official DMS plugin docs:
 
-Then install:
+- `https://danklinux.com/docs/dankmaterialshell/plugins-overview/`
+- `https://danklinux.com/docs/dankmaterialshell/plugin-development/`
 
-- `Surface Tablet Controls`
+## 7. Optional DMS-themed `wvkbd`
 
-That plugin gives you:
-
-- a recent-apps button for `qs-hyprview`
-- keyboard actions for `wvkbd`: auto, show, hide, disable
-
-Official Noctalia plugin docs:
-
-- `https://docs.noctalia.dev/plugins/overview/`
-- `https://docs.noctalia.dev/development/plugins/getting-started/`
-
-## 7. Optional: Noctalia theming for `wvkbd`
-
-Enable Noctalia user templates, then use the `wvkbd` template shipped in the `wvkbd` repo.
-
-The live path layout is:
-
-- `~/.config/noctalia/user-templates.toml`
-- `~/.config/noctalia/templates/wvkbd-theme.sh`
-- `~/.config/hypr/apps/wvkbd/generated/noctalia-theme.sh`
+The `wvkbd` repo ships a generated theme hook for shell-driven colors. If you
+do not use that flow, the keyboard still works with the defaults in
+`start-wvkbd.sh`.
 
 ## 8. Verify
 
 ```bash
 systemctl --user status qs-hyprview.service --no-pager
-pgrep -af 'fcitx5|wvkbd-deskintl-custom|quickshell'
+pgrep -af 'fcitx5|wvkbd-deskintl-custom|quickshell|dms'
 hyprctl binds | rg -n 'hyprgrass|qs-hyprview|wvkbd'
+dms ipc call plugins list
 ```
 
 Expected result:
@@ -191,4 +190,6 @@ Expected result:
 - `qs-hyprview.service` is running
 - `fcitx5` is running
 - `wvkbd-deskintl-custom` is running
+- DMS is running
+- `surfaceTabletControls` is listed as loaded
 - the Hyprgrass bindings are present

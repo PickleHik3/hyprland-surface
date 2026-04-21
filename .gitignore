@@ -1,5 +1,11 @@
 # local build outputs
+packages/wvkbd/bin/
+packages/wvkbd/build-*/
+packages/wvkbd/wvkbd-deskintl
 wvkbd-custom/build/
+
+# local-only deployment helper
+sync-live.sh
 
 # editor/system noise
 .DS_Store

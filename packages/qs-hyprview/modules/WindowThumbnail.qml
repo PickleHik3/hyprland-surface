@@ -1,0 +1,351 @@
+import QtQuick
+import QtQuick.Effects
+import Quickshell
+import Quickshell.Io
+import Quickshell.Widgets
+import Quickshell.Wayland
+import Quickshell.Hyprland
+import Qt5Compat.GraphicalEffects
+
+Item {
+    id: thumbContainer
+
+    property var hWin: null
+    property var wHandle:null
+    property var effectiveHandle: null
+
+    property string winKey: ''
+
+    property real thumbW: -1
+    property real thumbH: -1
+
+    property var clientInfo: {}
+    property bool hovered: false
+    property var exposeRoot: null
+    readonly property string windowAddress: hWin ? ("0x" + String(hWin.address)) : ""
+    property bool dropHandled: false
+
+    property real targetX: -1000
+    property real targetY: -1000
+    property real targetZ: 0
+    property real targetRotation: 0
+
+    property bool moveCursorToActiveWindow: false
+
+    width: thumbW
+    height: thumbH
+
+    x: 0
+    y: 0
+    z: targetZ
+    rotation: 0
+
+    visible: !!effectiveHandle
+
+    NumberAnimation {
+        id: animX
+        target: thumbContainer
+        property: "x"
+        duration: root.animateWindows ? 100 : 0
+        easing.type: Easing.OutQuad
+    }
+    NumberAnimation {
+        id: animY
+        target: thumbContainer
+        property: "y"
+        duration: root.animateWindows ? 100 : 0
+        easing.type: Easing.OutQuad
+    }
+    NumberAnimation {
+        id: animRotation
+        target: thumbContainer
+        property: "rotation"
+        duration: 400
+        easing.type: Easing.OutBack // Effetto rimbalzo/inerzia
+        easing.overshoot: 1.2
+    }
+
+    function updateLastPos() {
+        var lp = root.lastPositions || ({})
+        var prev = lp[winKey] || ({})
+        prev.x = x
+        prev.y = y
+        lp[winKey] = prev
+        root.lastPositions = lp
+    }
+
+    onTargetXChanged: {
+        if (!root.animateWindows) {
+            x = targetX
+            updateLastPos()
+            return
+        }
+
+        var lp = root.lastPositions || ({})
+        var prev = lp[winKey]
+        var startX = (prev && prev.x !== undefined) ? prev.x : targetX
+
+        if (startX === targetX) {
+            x = targetX
+            updateLastPos()
+            return
+        }
+
+        animX.stop()
+        animX.from = startX
+        animX.to = targetX
+        animX.start()
+    }
+
+    onTargetYChanged: {
+        if (!root.animateWindows) {
+            y = targetY
+            updateLastPos()
+            return
+        }
+
+        var lp = root.lastPositions || ({})
+        var prev = lp[winKey]
+        var startY = (prev && prev.y !== undefined) ? prev.y : targetY
+
+        if (startY === targetY) {
+            y = targetY
+            updateLastPos()
+            return
+        }
+
+        animY.stop()
+        animY.from = startY
+        animY.to = targetY
+        animY.start()
+    }
+
+    onTargetRotationChanged: {
+        rotation = targetRotation
+        animRotation.stop()
+        animRotation.from = 0
+        animRotation.to = targetRotation
+        animRotation.start()
+    }
+
+    onXChanged: updateLastPos()
+    onYChanged: updateLastPos()
+
+    Component.onCompleted: {
+        if (wHandle) effectiveHandle = wHandle
+        rotation = targetRotation
+        if (!root.animateWindows) {
+            x = targetX
+            y = targetY
+            updateLastPos()
+        }
+    }
+
+    onWHandleChanged: {
+        // Keep last known valid handle to avoid capture source flapping.
+        if (wHandle) effectiveHandle = wHandle
+    }
+
+    function activateWindow() {
+        if (!hWin) return
+
+        var targetIsSpecial = (hWin?.workspace ?? 0) < 0 || (hWin?.workspace?.name ?? "").startsWith("special")
+
+        if (root.specialActive && !targetIsSpecial) {
+            Hyprland.dispatch("togglespecialworkspace")
+        }
+
+        if (hWin.workspace) {
+            hWin.workspace.activate()
+        }
+
+        root.toggleExpose()
+        Hyprland.dispatch("focuswindow address:0x" + hWin.address)
+        Hyprland.dispatch("alterzorder top")
+        if (thumbContainer.moveCursorToActiveWindow) {
+          var cx = clientInfo.at[0] + (clientInfo.size[0]/2)
+          var cy = clientInfo.at[1] + (clientInfo.size[1]/2)
+        Hyprland.dispatch("movecursor " + cx + " " + cy)
+
+        }
+    }
+
+    function closeWindow() {
+        if (!hWin) return
+        Hyprland.dispatch("closewindow address:0x" + hWin.address)
+    }
+
+    function refreshThumb() {
+        if (thumbLoader.item) {
+            thumbLoader.item.captureFrame()
+        }
+    }
+
+    Item {
+        id: card
+        anchors.fill: parent
+
+        scale: thumbContainer.hovered ? 1.05 : 0.95
+        transformOrigin: Item.Center
+
+        Behavior on scale {
+            NumberAnimation { duration: 100; easing.type: Easing.OutQuad }
+        }
+
+        MouseArea {
+            id: dragArea
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            acceptedButtons: Qt.LeftButton | Qt.MiddleButton
+            drag.target: thumbContainer
+
+            property real startX: 0
+            property real startY: 0
+            property real startItemX: 0
+            property real startItemY: 0
+            property bool swipeTriggered: false
+            property bool dragMoved: false
+
+            onEntered: {
+                exposeArea.currentIndex = index
+            }
+            onPressed: event => {
+                startX = event.x
+                startY = event.y
+                startItemX = thumbContainer.x
+                startItemY = thumbContainer.y
+                swipeTriggered = false
+                dragMoved = false
+                thumbContainer.dropHandled = false
+                if (exposeRoot) exposeRoot.draggingFromWorkspace = (hWin && hWin.workspace) ? hWin.workspace.id : -1
+                thumbContainer.Drag.active = true
+                thumbContainer.Drag.source = thumbContainer
+                thumbContainer.Drag.hotSpot.x = event.x
+                thumbContainer.Drag.hotSpot.y = event.y
+            }
+            onPositionChanged: event => {
+                // During drag, local pointer coordinates can stay near the hotspot.
+                // Use item movement deltas to detect intentional swipe-up gestures.
+                var dx = thumbContainer.x - startItemX
+                var dy = thumbContainer.y - startItemY
+                if (Math.abs(dx) + Math.abs(dy) > 24) dragMoved = true
+                if (Math.abs(thumbContainer.x - thumbContainer.targetX) + Math.abs(thumbContainer.y - thumbContainer.targetY) > 20) {
+                    dragMoved = true
+                }
+                if (!swipeTriggered && dy < -80 && Math.abs(dx) < 180 && Math.abs(dy) > (Math.abs(dx) * 0.8)) {
+                    swipeTriggered = true
+                    thumbContainer.closeWindow()
+                }
+            }
+            onClicked: event => {
+                if (swipeTriggered || dragMoved) {
+                    event.accepted = true
+                    return
+                }
+                exposeArea.currentIndex = index
+
+                if (event.button === Qt.LeftButton) {
+                    thumbContainer.activateWindow()
+                }
+                if (event.button === Qt.MiddleButton) {
+                    thumbContainer.closeWindow()
+                }
+            }
+            onExited: {
+                if (exposeArea.currentIndex === index) {
+                    exposeArea.currentIndex = -1
+                }
+            }
+            onReleased: {
+                var targetWorkspace = (exposeRoot ? exposeRoot.draggingTargetWorkspace : -1)
+                var currentWorkspace = (hWin && hWin.workspace) ? hWin.workspace.id : -1
+                if (!swipeTriggered && exposeRoot && targetWorkspace > 0 && targetWorkspace !== currentWorkspace && thumbContainer.windowAddress) {
+                    exposeRoot.moveWindowToWorkspace(thumbContainer.windowAddress, targetWorkspace)
+                }
+                Qt.callLater(function() {
+                    thumbContainer.Drag.active = false
+                    if (exposeRoot) {
+                        exposeRoot.draggingFromWorkspace = -1
+                        exposeRoot.draggingTargetWorkspace = -1
+                    }
+                    thumbContainer.x = thumbContainer.targetX
+                    thumbContainer.y = thumbContainer.targetY
+                })
+            }
+            onCanceled: {
+                thumbContainer.Drag.active = false
+                if (exposeRoot) {
+                    exposeRoot.draggingFromWorkspace = -1
+                    exposeRoot.draggingTargetWorkspace = -1
+                }
+                thumbContainer.x = thumbContainer.targetX
+                thumbContainer.y = thumbContainer.targetY
+            }
+        }
+
+        RectangularShadow {
+            anchors.fill: parent
+            radius: 16
+            blur: (exposeRoot && exposeRoot.efficientMode && exposeRoot.thumbCount > 8) ? 14 : 24
+            spread: (exposeRoot && exposeRoot.efficientMode && exposeRoot.thumbCount > 8) ? 5 : 10
+            color: "#55000000"
+            cached: true
+            visible: false
+        }
+
+        Loader {
+            id: thumbLoader
+            anchors.fill: parent
+            active: root.isActive && !!thumbContainer.effectiveHandle
+            sourceComponent: ScreencopyView {
+                id: thumb
+                anchors.fill: parent
+                captureSource: thumbContainer.effectiveHandle
+                live: (root.liveCapture
+                    || ((exposeRoot && exposeRoot.dynamicLiveCapture)
+                        && (thumbContainer.hovered || exposeArea.currentIndex === index)))
+                    && root.isActive
+                paintCursor: false
+                visible: root.isActive && !!thumbContainer.effectiveHandle
+
+                layer.enabled: false
+
+                Rectangle {
+                    anchors.fill: parent
+                    color: thumbContainer.hovered ? "transparent": "#33000000"
+                    border.width : thumbContainer.hovered ? 3 : 1
+                    border.color : thumbContainer.hovered ? "#ff0088cc" : "#cc444444"
+                    radius: 16
+                }
+            }
+        }
+
+        Rectangle {
+            id: badge
+            z: 100
+            width: Math.min(titleText.implicitWidth + 24, thumbContainer.thumbW * 0.75)
+            height: titleText.implicitHeight + 12
+
+            x: (card.width - width) / 2
+            y: card.height - height - (card.height * 0.08)
+
+            radius: 12
+            color: thumbContainer.hovered ? "#FF000000" : "#CC000000"
+            border.width : 1
+            border.color : "#ff464646"
+
+            Text {
+                id: titleText
+                anchors.centerIn: parent
+                width: parent.width - 16
+                text: hWin.title
+                color: "white"
+                font.pixelSize: thumbContainer.hovered ? 13 : 12
+                elide: Text.ElideRight
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+            }
+        }
+    }
+}

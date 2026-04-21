@@ -19,14 +19,14 @@ Patched `wvkbd-deskintl` source and runnable scripts for Hyprland/fcitx5.
 ## Build
 
 ```bash
-cd ~/.config/hypr/wvkbd
+cd ~/.config/hypr/apps/wvkbd
 ./build-custom.sh
 ```
 
 ## Runtime scripts
 
 ```bash
-~/.config/hypr/wvkbd/scripts/start-wvkbd.sh
-~/.config/hypr/wvkbd/scripts/show-wvkbd.sh
-~/.config/hypr/wvkbd/scripts/hide-wvkbd.sh
+~/.config/hypr/apps/wvkbd/scripts/start-wvkbd.sh
+~/.config/hypr/apps/wvkbd/scripts/show-wvkbd.sh
+~/.config/hypr/apps/wvkbd/scripts/hide-wvkbd.sh
 ```

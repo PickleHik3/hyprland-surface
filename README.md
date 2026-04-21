@@ -65,6 +65,9 @@ It also builds the custom `wvkbd` binary and enables:
 - `wvkbd.service`
 - `fcitx-wvkbd-auto.service`
 
+Hyprland starts DMS, Fcitx, `hyprgrass`, and `iio-hyprland`; the custom
+keyboard itself is owned by `wvkbd.service`, not by a Hypr `exec-once` line.
+
 If this is the first time installing the Fcitx environment files, restart the
 user session after installation.
 

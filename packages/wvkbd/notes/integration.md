@@ -3,11 +3,11 @@
 Use these paths in configs:
 
 - Startup:
-  - `~/.config/hypr/wvkbd/scripts/start-wvkbd.sh`
+  - `wvkbd.service` runs `~/.config/hypr/apps/wvkbd/scripts/start-wvkbd.sh`
 - Force show:
-  - `~/.config/hypr/wvkbd/scripts/show-wvkbd.sh`
+  - `~/.config/hypr/apps/wvkbd/scripts/show-wvkbd.sh`
 - Force hide:
-  - `~/.config/hypr/wvkbd/scripts/hide-wvkbd.sh`
+  - `~/.config/hypr/apps/wvkbd/scripts/hide-wvkbd.sh`
 
 Current runtime files:
 

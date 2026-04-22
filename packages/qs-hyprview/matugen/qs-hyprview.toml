@@ -1,0 +1,5 @@
+[config]
+
+[templates.qs_hyprview_colors]
+input_path = 'QS_HYPRVIEW_TEMPLATE'
+output_path = 'QS_HYPRVIEW_OUTPUT'

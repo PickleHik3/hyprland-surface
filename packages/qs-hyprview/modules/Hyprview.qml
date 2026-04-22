@@ -7,6 +7,7 @@ import Quickshell.Wayland
 import Quickshell.Hyprland
 import Qt5Compat.GraphicalEffects
 import "../layouts"
+import "../generated"
 import "."
 
 PanelWindow {
@@ -28,9 +29,21 @@ PanelWindow {
     property int draggingFromWorkspace: -1
     property bool efficientMode: true
     property int refreshCursor: 0
+    property string backdropPath: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/qs-hyprview-backdrop.png"
+    property int backdropRevision: 0
+    property bool openingAfterCapture: false
     readonly property int thumbCount: winRepeater.count
     property int edgePadding: 40
     readonly property bool dynamicLiveCapture: efficientMode && isActive && thumbCount <= 8
+    readonly property color dmsSurface: dmsColors.surface
+    readonly property color dmsSurfaceContainer: dmsColors.surfaceContainer
+    readonly property color dmsPrimary: dmsColors.primary
+    readonly property color dmsOutline: dmsColors.outline
+    readonly property color dmsOnSurface: dmsColors.surfaceText
+
+    DmsColors {
+        id: dmsColors
+    }
 
     anchors { top: true; bottom: true; left: true; right: true }
     color: "transparent"
@@ -47,18 +60,21 @@ PanelWindow {
         target: "expose"
         function toggle(layout: string) {
             root.layoutAlgorithm = "smartgrid"
-            root.toggleExpose()
+            if (root.isActive)
+                root.closeExpose()
+            else
+                root.requestOpenExpose()
         }
 
         function open(layout: string) {
             root.layoutAlgorithm = "smartgrid"
             if (root.isActive) return
-            root.toggleExpose()
+            root.requestOpenExpose()
         }
 
         function close() {
             if (!root.isActive) return
-            root.toggleExpose()
+            root.closeExpose()
         }
     }
 
@@ -112,21 +128,63 @@ PanelWindow {
     }
 
 
-    function toggleExpose() {
-        root.isActive = !root.isActive
-        if (root.isActive) {
-            root.lastLayoutAlgorithm = "smartgrid"
-            root.refreshCursor = 0
-
-            exposeArea.currentIndex = -1
-            searchBox.reset()
-            Hyprland.refreshToplevels()
-            refreshThumbs(true)
-        } else {
-            root.animateWindows = false
-            root.lastPositions = {}
-            root.refreshCursor = 0
+    Process {
+        id: backdropCapture
+        running: false
+        command: ["grim", root.backdropPath]
+        onExited: function(exitCode) {
+            captureFallback.stop()
+            root.openingAfterCapture = false
+            if (exitCode === 0)
+                root.backdropRevision += 1
+            root.openExpose()
         }
+    }
+
+    Timer {
+        id: captureFallback
+        interval: 220
+        repeat: false
+        onTriggered: {
+            if (!root.openingAfterCapture)
+                return
+            root.openingAfterCapture = false
+            backdropCapture.running = false
+            root.openExpose()
+        }
+    }
+
+    function requestOpenExpose() {
+        if (root.isActive || root.openingAfterCapture)
+            return
+        root.openingAfterCapture = true
+        captureFallback.restart()
+        backdropCapture.running = false
+        backdropCapture.running = true
+    }
+
+    function openExpose() {
+        if (root.isActive)
+            return
+        root.isActive = true
+        root.lastLayoutAlgorithm = "smartgrid"
+        root.refreshCursor = 0
+
+        exposeArea.currentIndex = -1
+        searchBox.reset()
+        Hyprland.refreshToplevels()
+        refreshThumbs(true)
+    }
+
+    function closeExpose() {
+        root.isActive = false
+        root.animateWindows = false
+        root.lastPositions = {}
+        root.refreshCursor = 0
+    }
+
+    function withAlpha(value, alpha) {
+        return Qt.rgba(value.r, value.g, value.b, alpha)
     }
 
     function refreshThumbs(forceAll) {
@@ -186,7 +244,7 @@ PanelWindow {
             if (!root.isActive) return
 
             if (event.key === Qt.Key_Escape) {
-                root.toggleExpose()
+                root.closeExpose()
                 event.accepted = true
                 return
             }
@@ -277,7 +335,54 @@ PanelWindow {
             anchors.fill: parent
             hoverEnabled: false
             z: -1
-            onClicked: root.toggleExpose()
+            onClicked: root.closeExpose()
+        }
+
+        Item {
+            id: glassBackdrop
+            anchors.fill: parent
+            z: -2
+
+            Image {
+                id: capturedBackdrop
+                anchors.fill: parent
+                cache: false
+                fillMode: Image.PreserveAspectCrop
+                smooth: true
+                source: root.backdropRevision > 0 ? "file://" + root.backdropPath + "?v=" + root.backdropRevision : ""
+                visible: status === Image.Ready
+
+                layer.enabled: true
+                layer.effect: MultiEffect {
+                    blurEnabled: true
+                    blur: dmsColors.backdropBlur
+                    blurMax: dmsColors.backdropBlurMax
+                    saturation: dmsColors.backdropSaturation
+                    brightness: dmsColors.backdropBrightness
+                }
+            }
+
+            Rectangle {
+                anchors.fill: parent
+                color: root.withAlpha(dmsColors.surface, dmsColors.glassBaseOpacity)
+            }
+
+            Rectangle {
+                anchors.fill: parent
+                gradient: Gradient {
+                    GradientStop { position: 0.0; color: dmsColors.primaryContainer }
+                    GradientStop { position: 0.48; color: dmsColors.surfaceContainer }
+                    GradientStop { position: 1.0; color: dmsColors.secondaryContainer }
+                }
+                opacity: dmsColors.glassAccentOpacity
+            }
+
+            Rectangle {
+                anchors.fill: parent
+                color: root.withAlpha(dmsColors.background, dmsColors.glassDimOpacity)
+                border.width: 1
+                border.color: dmsColors.outline
+            }
         }
 
         Item {
@@ -296,6 +401,10 @@ PanelWindow {
                     width: Math.min(layoutRoot.width * 0.68, 760)
                     anchors.top: layoutRoot.top
                     anchors.horizontalCenter: layoutRoot.horizontalCenter
+                    backgroundColor: dmsColors.surfaceContainer
+                    borderColor: dmsColors.outline
+                    textColor: dmsColors.surfaceText
+                    placeholderColor: dmsColors.surfaceVariantText
                     onTextChanged: function(text) {
                         root.animateWindows = true
                         exposeArea.searchText = text
@@ -428,9 +537,9 @@ PanelWindow {
                     anchors.left: layoutRoot.left
                     anchors.right: layoutRoot.right
                     anchors.bottom: layoutRoot.bottom
-                    color: "#73101420"
+                    color: root.withAlpha(dmsColors.surfaceContainer, 0.88)
                     border.width: 1
-                    border.color: "#335b6780"
+                    border.color: dmsColors.outline
 
                     ScriptModel {
                         id: workspaceModel
@@ -600,9 +709,11 @@ PanelWindow {
                                     width: Math.max(128, (workspaceGrid.width - (workspaceGrid.spacing * Math.max(workspaceGrid.columns - 1, 0))) / Math.max(workspaceGrid.columns, 1))
                                     height: workspaceGrid.cardHeight
                                     radius: 14
-                                    color: root.activeWorkspaceId === workspaceId ? "#AA2A4365" : (isExtra ? "#44333a46" : "#5524262a")
+                                    color: root.activeWorkspaceId === workspaceId
+                                        ? root.withAlpha(dmsColors.primaryContainer, 0.94)
+                                        : root.withAlpha(isExtra ? dmsColors.surface : dmsColors.surfaceContainerHigh, 0.82)
                                     border.width: root.draggingTargetWorkspace === workspaceId ? 2 : 1
-                                    border.color: root.draggingTargetWorkspace === workspaceId ? "#FF77B8FF" : "#557f8ea3"
+                                    border.color: root.draggingTargetWorkspace === workspaceId ? dmsColors.primary : dmsColors.outline
 
                                     Column {
                                         anchors.fill: parent
@@ -615,14 +726,14 @@ PanelWindow {
 
                                             Text {
                                                 text: "Workspace " + workspaceName
-                                                color: "white"
+                                                color: dmsColors.surfaceText
                                                 font.pixelSize: 14
                                                 font.bold: root.activeWorkspaceId === workspaceId
                                             }
 
                                             Text {
                                                 text: isExtra ? "+ new" : (workspaceWindows.length + " win")
-                                                color: "#b8d8ff"
+                                                color: root.activeWorkspaceId === workspaceId ? dmsColors.primaryContainerText : dmsColors.surfaceVariantText
                                                 font.pixelSize: 13
                                             }
                                         }
@@ -631,9 +742,9 @@ PanelWindow {
                                             width: parent.width
                                             height: Math.max(58, parent.height - 30)
                                             radius: 10
-                                            color: "#33000000"
+                                            color: root.withAlpha(dmsColors.surface, 0.72)
                                             border.width: 1
-                                            border.color: "#33556677"
+                                            border.color: dmsColors.outline
 
                                             Item {
                                                 anchors.fill: parent
@@ -651,16 +762,16 @@ PanelWindow {
                                                         width: Math.max(42, Math.round(tile.w * parent.width) - 5)
                                                         height: Math.max(26, Math.round(tile.h * parent.height) - 5)
                                                         radius: 10
-                                                        color: "#6E5E7A9A"
+                                                        color: root.withAlpha(dmsColors.secondaryContainer, 0.88)
                                                         border.width: 1
-                                                        border.color: "#77a2c5ef"
+                                                        border.color: dmsColors.primary
 
                                                         Text {
                                                             anchors.centerIn: parent
                                                             text: (Number(tile.stackCount || 1) > 1)
                                                                 ? (String(tile.stackCount) + " stacked")
                                                                 : String(tile.appName || "?").slice(0, 10)
-                                                            color: "white"
+                                                            color: dmsColors.surfaceText
                                                             font.pixelSize: 10
                                                             font.bold: true
                                                             elide: Text.ElideRight
@@ -674,14 +785,14 @@ PanelWindow {
                                                             width: 20
                                                             height: 16
                                                             radius: 8
-                                                            color: "#AA0E1A2D"
+                                                            color: dmsColors.primaryContainer
                                                             border.width: 1
-                                                            border.color: "#88B6D7FF"
+                                                            border.color: dmsColors.primary
 
                                                             Text {
                                                                 anchors.centerIn: parent
                                                                 text: String(tile.stackCount)
-                                                                color: "white"
+                                                                color: dmsColors.primaryContainerText
                                                                 font.pixelSize: 9
                                                                 font.bold: true
                                                             }
@@ -693,7 +804,7 @@ PanelWindow {
                                                     visible: workspaceLayoutTiles.length === 0
                                                     anchors.centerIn: parent
                                                     text: isExtra ? "Drop here to create" : "No windows"
-                                                    color: "#8fa8c8"
+                                                    color: dmsColors.surfaceVariantText
                                                     font.pixelSize: 12
                                                 }
                                             }

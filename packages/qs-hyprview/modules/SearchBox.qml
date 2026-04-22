@@ -6,12 +6,20 @@ Rectangle {
     width: Math.min(parent.width * 0.6, 480)
     height: 40
     radius: 20
-    color: "#66000000"
+    color: withAlpha(backgroundColor, 0.86)
     border.width: 1
-    border.color: "#33ffffff"
+    border.color: borderColor
     anchors.horizontalCenter: parent.horizontalCenter
 
     property var onTextChanged: null
+    property color backgroundColor: "#66000000"
+    property color borderColor: "#33ffffff"
+    property color textColor: "white"
+    property color placeholderColor: "#88ffffff"
+
+    function withAlpha(value, alpha) {
+        return Qt.rgba(value.r, value.g, value.b, alpha)
+    }
 
     function reset() {
       searchInput.text = ""
@@ -23,7 +31,7 @@ Rectangle {
         anchors.leftMargin: 16
         anchors.rightMargin: 16
         verticalAlignment: TextInput.AlignVCenter
-        color: "white"
+        color: searchBar.textColor
         font.pixelSize: 16
         activeFocusOnTab: false
         selectByMouse: true
@@ -36,7 +44,7 @@ Rectangle {
         Text {
             anchors.fill: parent
             verticalAlignment: Text.AlignVCenter
-            color: "#88ffffff"
+            color: searchBar.placeholderColor
             font.pixelSize: 14
             text: "Type to filter windows..."
             visible: !searchInput.text || searchInput.text.length === 0

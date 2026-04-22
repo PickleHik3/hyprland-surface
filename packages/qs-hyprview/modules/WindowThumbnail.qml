@@ -159,7 +159,7 @@ Item {
             hWin.workspace.activate()
         }
 
-        root.toggleExpose()
+        root.closeExpose()
         Hyprland.dispatch("focuswindow address:0x" + hWin.address)
         Hyprland.dispatch("alterzorder top")
         if (thumbContainer.moveCursorToActiveWindow) {
@@ -331,16 +331,18 @@ Item {
             y: card.height - height - (card.height * 0.08)
 
             radius: 12
-            color: thumbContainer.hovered ? "#FF000000" : "#CC000000"
+            color: exposeRoot
+                ? exposeRoot.withAlpha(exposeRoot.dmsSurface, thumbContainer.hovered ? 0.96 : 0.82)
+                : (thumbContainer.hovered ? "#FF000000" : "#CC000000")
             border.width : 1
-            border.color : "#ff464646"
+            border.color : exposeRoot ? (thumbContainer.hovered ? exposeRoot.dmsPrimary : exposeRoot.dmsOutline) : "#ff464646"
 
             Text {
                 id: titleText
                 anchors.centerIn: parent
                 width: parent.width - 16
                 text: hWin.title
-                color: "white"
+                color: exposeRoot ? exposeRoot.dmsOnSurface : "white"
                 font.pixelSize: thumbContainer.hovered ? 13 : 12
                 elide: Text.ElideRight
                 horizontalAlignment: Text.AlignHCenter

@@ -9,9 +9,9 @@ packages/
   surface-dms/      DMS plugin with Back, Keyboard Toggle, and Recent Apps
   qs-hyprview/      Quickshell recent-apps overview
   wvkbd/            Patched wvkbd source, scripts, and Fcitx integration files
-  hypr/             Hyprland config snapshot
+  hypr/             Single-file Hyprland config snapshot plus DMS generated files
   sddm/             SDDM silent-theme tablet config
-systemd/user/       User services for wvkbd and the Fcitx focus watcher
+systemd/user/       User services and the Hyprland session target
 docs/               Notes and troubleshooting
 install.sh          Installs the packaged setup into the live config paths
 uninstall.sh        Removes app packages and user services
@@ -25,12 +25,13 @@ Install the base packages first:
 sudo pacman -S --needed \
   sddm qt5-virtualkeyboard \
   fcitx5 fcitx5-gtk fcitx5-qt fcitx5-configtool \
-  git cmake base-devel rsync
+  git cmake base-devel rsync grim
 ```
 
 Install separately as needed:
 
 - Dank Material Shell, using the official DMS install method
+- `matugen`, normally installed as part of the DMS theming stack
 - `sddm-silent-theme`
 - `iio-hyprland`
 - `hyprgrass`
@@ -53,14 +54,19 @@ The installer copies:
 - Fcitx environment and virtual keyboard config files to `~/.config`
 - user services to `~/.config/systemd/user`
 
+It also registers the `qs-hyprview` matugen template in
+`~/.config/matugen/config.toml`, so DMS-generated Material colors are written to
+`~/.config/hypr/apps/qs-hyprview/generated/DmsColors.qml`.
+
 It also builds the custom `wvkbd` binary and enables:
 
+- `hyprland-session.target`
 - `qs-hyprview.service`
 - `wvkbd.service`
 - `fcitx-wvkbd-auto.service`
 
-Hyprland starts DMS, Fcitx, `hyprgrass`, and `iio-hyprland`; the custom
-keyboard itself is owned by `wvkbd.service`, not by a Hypr `exec-once` line.
+Hyprland starts the user session target, Fcitx, and `iio-hyprland`; DMS,
+`qs-hyprview`, and the custom keyboard are owned by systemd user units.
 
 If this is the first time installing the Fcitx environment files, restart the
 user session after installation.
@@ -81,6 +87,18 @@ Recommended variants:
 - `Recent Apps`
 - `Keyboard Toggle`
 - `Back`
+
+## Recent Apps Colors
+
+`qs-hyprview` follows the DMS application theming flow by shipping a matugen
+template for a small QML color module. DMS can regenerate that module when the
+wallpaper or Material palette changes. The checked-in generated file is a
+fallback based on the current DMS palette, so the recent-apps screen works
+before the first regeneration.
+
+The glass backdrop is rendered by `qs-hyprview` itself. It uses `grim` to capture
+the screen before the overlay is shown, then applies a dark DMS-tinted blur over
+that capture. No Hyprland layer blur rule is required for this effect.
 
 ## Keyboard Model
 

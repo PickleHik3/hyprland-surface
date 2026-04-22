@@ -2,9 +2,6 @@
 
 Packaged Surface Pro 7 Hyprland tablet setup around Dank Material Shell.
 
-This repository vendors the current working pieces together so the setup can be
-installed from one checkout instead of rebuilding from several separate repos.
-
 ## Layout
 
 ```text
@@ -19,9 +16,6 @@ docs/               Notes and troubleshooting
 install.sh          Installs the packaged setup into the live config paths
 uninstall.sh        Removes app packages and user services
 ```
-
-`sync-live.sh` is intentionally ignored and not part of the online copy. Keep it
-local if you want a fast developer sync script.
 
 ## Dependencies
 
@@ -87,8 +81,6 @@ Recommended variants:
 - `Recent Apps`
 - `Keyboard Toggle`
 - `Back`
-
-The old `Home` variant is no longer part of the plugin.
 
 ## Keyboard Model
 

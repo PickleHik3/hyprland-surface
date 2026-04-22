@@ -27,14 +27,39 @@ copy_file() {
   cp -f "$src" "$dest"
 }
 
+install_qs_hyprview_matugen_template() {
+  local config="$HOME/.config/matugen/config.toml"
+  local config_template="$HOME/.config/hypr/apps/qs-hyprview/matugen/qs-hyprview.toml"
+  local template="$HOME/.config/hypr/apps/qs-hyprview/matugen/templates/DmsColors.qml"
+  local output="$HOME/.config/hypr/apps/qs-hyprview/generated/DmsColors.qml"
+  local block
+
+  mkdir -p "$(dirname "$config")" "$(dirname "$output")"
+  touch "$config"
+
+  if ! grep -q '^\[config\]' "$config"; then
+    printf '\n[config]\n' >>"$config"
+  fi
+
+  if ! grep -q '^\[templates\.qs_hyprview_colors\]' "$config"; then
+    block="$(grep -v '^\[config\]$' "$config_template" | sed \
+      -e "s|QS_HYPRVIEW_TEMPLATE|$template|g" \
+      -e "s|QS_HYPRVIEW_OUTPUT|$output|g")"
+    printf '\n%s\n' "$block" >>"$config"
+  fi
+}
+
 copy_tree "$ROOT/packages/wvkbd" "$HOME/.config/hypr/apps/wvkbd"
 copy_tree "$ROOT/packages/qs-hyprview" "$HOME/.config/hypr/apps/qs-hyprview"
 copy_tree "$ROOT/packages/surface-dms" "$HOME/.config/DankMaterialShell/plugins/surface-dms"
 copy_tree_merge "$ROOT/packages/hypr" "$HOME/.config/hypr"
 
+install_qs_hyprview_matugen_template
+
 copy_file "$ROOT/packages/wvkbd/integration/environment.d/10-fcitx.conf" "$HOME/.config/environment.d/10-fcitx.conf"
 copy_file "$ROOT/packages/wvkbd/integration/fcitx5/conf/virtualkeyboardadapter.conf" "$HOME/.config/fcitx5/conf/virtualkeyboardadapter.conf"
 
+copy_file "$ROOT/systemd/user/hyprland-session.target" "$HOME/.config/systemd/user/hyprland-session.target"
 copy_file "$ROOT/packages/qs-hyprview/systemd-user/qs-hyprview.service" "$HOME/.config/systemd/user/qs-hyprview.service"
 copy_file "$ROOT/systemd/user/wvkbd.service" "$HOME/.config/systemd/user/wvkbd.service"
 copy_file "$ROOT/systemd/user/fcitx-wvkbd-auto.service" "$HOME/.config/systemd/user/fcitx-wvkbd-auto.service"

@@ -19,22 +19,26 @@ uninstall.sh        Removes app packages and user services
 
 ## Dependencies
 
-Install the base packages first:
+Install the required packages first:
 
 ```bash
 sudo pacman -S --needed \
   sddm qt5-virtualkeyboard \
   fcitx5 fcitx5-gtk fcitx5-qt fcitx5-configtool \
-  git cmake base-devel rsync
+  git cmake base-devel rsync jq \
+  quickshell uwsm
 ```
 
-Install separately as needed:
+Install these separately before using the packaged Hypr config:
 
-- Dank Material Shell, using the official DMS install method
-- `sddm-silent-theme`
 - `iio-hyprland`
-- `hyprgrass`
+- Dank Material Shell, using the official DMS install method
 - `linux-surface`, if this is a Surface device
+
+Install these only if you want the matching integration:
+
+- `hyprgrass`, for the packaged gesture binding that opens recent apps
+- `sddm-silent-theme`, for the packaged SDDM theme files
 
 ## Install
 
@@ -53,14 +57,20 @@ The installer copies:
 - Fcitx environment and virtual keyboard config files to `~/.config`
 - user services to `~/.config/systemd/user`
 
+For `packages/wvkbd`, `packages/qs-hyprview`, and `packages/surface-dms`, the
+installer uses `rsync --delete`. Re-running `./install.sh` replaces the
+deployed copies in `~/.config` with the versions from this repo.
+
 It also builds the custom `wvkbd` binary and enables:
 
 - `qs-hyprview.service`
 - `wvkbd.service`
 - `fcitx-wvkbd-auto.service`
 
-Hyprland starts DMS, Fcitx, `hyprgrass`, and `iio-hyprland`; the custom
-keyboard itself is owned by `wvkbd.service`, not by a Hypr `exec-once` line.
+The packaged Hypr config starts DMS, Fcitx, and `iio-hyprland`. If `hyprgrass`
+is installed, the packaged gesture binding opens recent apps through
+`quickshell ipc`. The custom keyboard itself is owned by `wvkbd.service`, not
+by a Hypr `exec-once` line.
 
 If this is the first time installing the Fcitx environment files, restart the
 user session after installation.

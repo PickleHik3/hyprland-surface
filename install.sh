@@ -3,58 +3,57 @@ set -euo pipefail
 
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
-copy_tree() {
-  local src="$1"
-  local dest="$2"
+printf '%s\n' \
+  'Choose what to install:' \
+  '1. All' \
+  '2. wvkbd' \
+  '3. qs-hyprview (window overview)' \
+  '4. DMS plugin'
+printf 'Enter choice [1-4]: '
+read -r choice
 
-  mkdir -p "$dest"
-  rsync -a --delete "$src"/ "$dest"/
-}
+case "$choice" in
+  1)
+    "$ROOT/scripts/install-hypr-config.sh"
+    "$ROOT/scripts/install-qs-hyprview.sh"
+    "$ROOT/scripts/install-wvkbd.sh"
+    "$ROOT/scripts/install-surface-dms.sh"
+    cat <<'EOF'
+Installed the full hyprland-surface package set.
 
-copy_tree_merge() {
-  local src="$1"
-  local dest="$2"
+Installed locations:
+- Hyprland config: ~/.config/hypr
+- wvkbd app: ~/.config/hypr/apps/wvkbd
+- wvkbd binary: ~/.config/hypr/apps/wvkbd/bin/wvkbd-deskintl-custom
+- qs-hyprview app: ~/.config/hypr/apps/qs-hyprview
+- DMS plugin: ~/.config/DankMaterialShell/plugins/surface-dms
+- Fcitx environment file: ~/.config/environment.d/10-fcitx.conf
+- Fcitx virtual keyboard config: ~/.config/fcitx5/conf/virtualkeyboardadapter.conf
+- user services: ~/.config/systemd/user/{wvkbd.service,fcitx-wvkbd-auto.service,qs-hyprview.service}
 
-  mkdir -p "$dest"
-  rsync -a "$src"/ "$dest"/
-}
-
-copy_file() {
-  local src="$1"
-  local dest="$2"
-
-  mkdir -p "$(dirname "$dest")"
-  cp -f "$src" "$dest"
-}
-
-copy_tree "$ROOT/packages/wvkbd" "$HOME/.config/hypr/apps/wvkbd"
-copy_tree "$ROOT/packages/qs-hyprview" "$HOME/.config/hypr/apps/qs-hyprview"
-copy_tree "$ROOT/packages/surface-dms" "$HOME/.config/DankMaterialShell/plugins/surface-dms"
-copy_tree_merge "$ROOT/packages/hypr" "$HOME/.config/hypr"
-
-copy_file "$ROOT/packages/wvkbd/integration/environment.d/10-fcitx.conf" "$HOME/.config/environment.d/10-fcitx.conf"
-copy_file "$ROOT/packages/wvkbd/integration/fcitx5/conf/virtualkeyboardadapter.conf" "$HOME/.config/fcitx5/conf/virtualkeyboardadapter.conf"
-
-copy_file "$ROOT/packages/qs-hyprview/systemd-user/qs-hyprview.service" "$HOME/.config/systemd/user/qs-hyprview.service"
-copy_file "$ROOT/systemd/user/wvkbd.service" "$HOME/.config/systemd/user/wvkbd.service"
-copy_file "$ROOT/systemd/user/fcitx-wvkbd-auto.service" "$HOME/.config/systemd/user/fcitx-wvkbd-auto.service"
-
-"$HOME/.config/hypr/apps/wvkbd/build-custom.sh"
-
-systemctl --user daemon-reload
-systemctl --user enable --now qs-hyprview.service
-systemctl --user enable --now wvkbd.service
-systemctl --user enable --now fcitx-wvkbd-auto.service
-
-if command -v dms >/dev/null 2>&1; then
-  dms restart || true
-fi
-
-cat <<'EOF'
-Installed hyprland-surface packages.
+For direct component installs, use:
+- ./scripts/install-hypr-config.sh
+- ./scripts/install-qs-hyprview.sh
+- ./scripts/install-wvkbd.sh
+- ./scripts/install-surface-dms.sh
 
 Next steps:
 1. Restart the user session if this is the first Fcitx environment install.
 2. In DMS settings, scan plugins and enable Surface Tablet Controls.
 3. Add Recent Apps, Keyboard Toggle, and Back to DankBar.
 EOF
+    ;;
+  2)
+    "$ROOT/scripts/install-wvkbd.sh"
+    ;;
+  3)
+    "$ROOT/scripts/install-qs-hyprview.sh"
+    ;;
+  4)
+    "$ROOT/scripts/install-surface-dms.sh"
+    ;;
+  *)
+    printf 'Invalid choice: %s\n' "$choice" >&2
+    exit 1
+    ;;
+esac

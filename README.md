@@ -15,6 +15,7 @@ systemd/user/       User services for wvkbd and the Fcitx focus watcher
 docs/               Notes and troubleshooting
 install.sh          Installs the packaged setup into the live config paths
 uninstall.sh        Removes app packages and user services
+scripts/            Per-component install and uninstall helpers
 ```
 
 ## Dependencies
@@ -42,13 +43,37 @@ Install these only if you want the matching integration:
 
 ## Install
 
-From the repo root:
+Use the per-component scripts you need from the repo root:
+
+```bash
+./scripts/install-wvkbd.sh
+./scripts/install-qs-hyprview.sh
+./scripts/install-surface-dms.sh
+./scripts/install-hypr-config.sh
+```
+
+Component scope:
+
+- `install-wvkbd.sh`: deploys `packages/wvkbd`, installs Fcitx integration
+  files, builds the custom binary, and enables `wvkbd.service` plus
+  `fcitx-wvkbd-auto.service`
+- `install-qs-hyprview.sh`: deploys `packages/qs-hyprview` and enables
+  `qs-hyprview.service`
+- `install-surface-dms.sh`: deploys the DMS plugin and restarts DMS if present
+- `install-hypr-config.sh`: merges the packaged Hyprland config into
+  `~/.config/hypr`
+
+## Install Everything
+
+If you want the previous all-in-one behavior:
 
 ```bash
 ./install.sh
 ```
 
-The installer copies:
+The full installer runs the component scripts above.
+
+Installed paths:
 
 - `packages/wvkbd` to `~/.config/hypr/apps/wvkbd`
 - `packages/qs-hyprview` to `~/.config/hypr/apps/qs-hyprview`
@@ -137,5 +162,14 @@ dms ipc plugins status surfaceTabletControls
 ./uninstall.sh
 ```
 
-The uninstaller removes app packages and user services. It intentionally leaves
-Hyprland config, Fcitx config, DMS settings, and SDDM system files in place.
+The full uninstaller removes the packaged apps and user services. It
+intentionally leaves Hyprland config, Fcitx config, DMS settings, and SDDM
+system files in place.
+
+For selective removal:
+
+```bash
+./scripts/uninstall-wvkbd.sh
+./scripts/uninstall-qs-hyprview.sh
+./scripts/uninstall-surface-dms.sh
+```

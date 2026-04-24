@@ -401,10 +401,11 @@ PanelWindow {
                             clientInfo: hWin.lastIpcObject
 
                             // Layout-generated coordinates
-                            targetX: modelData.x
-                            targetY: modelData.y
-                            targetZ: (visible && (exposeArea.currentIndex === index)) ? 1000: modelData.zIndex || 0
-                            targetRotation: modelData.rotation || 0
+                            targetX: (modelData && modelData.x !== undefined) ? modelData.x : -1000
+                            targetY: (modelData && modelData.y !== undefined) ? modelData.y : -1000
+                            targetZ: (visible && (exposeArea.currentIndex === index)) ? 1000 : ((modelData && modelData.zIndex) ? modelData.zIndex : 0)
+                            targetRotation: (modelData && modelData.rotation) ? modelData.rotation : 0
+                            workspaceId: (modelData && modelData.workspaceId) ? modelData.workspaceId : ((hWin && hWin.workspace) ? hWin.workspace.id : -1)
 
                             hovered: visible && (exposeArea.currentIndex === index)
                             moveCursorToActiveWindow: root.moveCursorToActiveWindow

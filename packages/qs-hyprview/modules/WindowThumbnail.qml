@@ -22,8 +22,12 @@ Item {
     property var clientInfo: {}
     property bool hovered: false
     property var exposeRoot: null
+    property int workspaceId: -1
     readonly property string windowAddress: hWin ? ("0x" + String(hWin.address)) : ""
     property bool dropHandled: false
+    property bool tilePressed: false
+    property bool dragMode: false
+    property bool swipePreview: false
 
     property real targetX: -1000
     property real targetY: -1000
@@ -175,6 +179,22 @@ Item {
         Hyprland.dispatch("closewindow address:0x" + hWin.address)
     }
 
+    function currentWorkspaceId() {
+        if (workspaceId > 0)
+            return Number(workspaceId)
+        if (hWin && hWin.workspace && hWin.workspace.id !== undefined)
+            return Number(hWin.workspace.id)
+        if (clientInfo && clientInfo.workspace && clientInfo.workspace.id !== undefined)
+            return Number(clientInfo.workspace.id)
+        return -1
+    }
+
+    function sendToWorkspace(workspaceId) {
+        if (!exposeRoot || !thumbContainer.windowAddress || workspaceId < 1)
+            return
+        exposeRoot.moveWindowToWorkspace(thumbContainer.windowAddress, workspaceId)
+    }
+
     function refreshThumb() {
         if (thumbLoader.item) {
             thumbLoader.item.captureFrame()
@@ -185,12 +205,8 @@ Item {
         id: card
         anchors.fill: parent
 
-        scale: thumbContainer.hovered ? 1.05 : 0.95
+        scale: 1.0
         transformOrigin: Item.Center
-
-        Behavior on scale {
-            NumberAnimation { duration: 100; easing.type: Easing.OutQuad }
-        }
 
         MouseArea {
             id: dragArea
@@ -198,42 +214,89 @@ Item {
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
             acceptedButtons: Qt.LeftButton | Qt.MiddleButton
-            drag.target: thumbContainer
 
             property real startX: 0
             property real startY: 0
+            property real startSceneX: 0
+            property real startSceneY: 0
             property real startItemX: 0
             property real startItemY: 0
             property bool swipeTriggered: false
             property bool dragMoved: false
 
+            function eventPoint(event) {
+                return dragArea.mapToItem(null, event.x, event.y)
+            }
+
+            function resetGestureState() {
+                longPressTimer.stop()
+                thumbContainer.tilePressed = false
+                thumbContainer.dragMode = false
+                thumbContainer.swipePreview = false
+                thumbContainer.Drag.active = false
+                if (exposeRoot) {
+                    exposeRoot.draggingFromWorkspace = -1
+                    exposeRoot.draggingTargetWorkspace = -1
+                }
+            }
+
             onEntered: {
                 exposeArea.currentIndex = index
             }
             onPressed: event => {
+                var point = eventPoint(event)
                 startX = event.x
                 startY = event.y
+                startSceneX = point.x
+                startSceneY = point.y
                 startItemX = thumbContainer.x
                 startItemY = thumbContainer.y
                 swipeTriggered = false
                 dragMoved = false
+                thumbContainer.tilePressed = true
+                thumbContainer.dragMode = false
+                thumbContainer.swipePreview = false
                 thumbContainer.dropHandled = false
-                if (exposeRoot) exposeRoot.draggingFromWorkspace = (hWin && hWin.workspace) ? hWin.workspace.id : -1
-                thumbContainer.Drag.active = true
                 thumbContainer.Drag.source = thumbContainer
                 thumbContainer.Drag.hotSpot.x = event.x
                 thumbContainer.Drag.hotSpot.y = event.y
+                longPressTimer.restart()
             }
             onPositionChanged: event => {
-                // During drag, local pointer coordinates can stay near the hotspot.
-                // Use item movement deltas to detect intentional swipe-up gestures.
-                var dx = thumbContainer.x - startItemX
-                var dy = thumbContainer.y - startItemY
-                if (Math.abs(dx) + Math.abs(dy) > 24) dragMoved = true
-                if (Math.abs(thumbContainer.x - thumbContainer.targetX) + Math.abs(thumbContainer.y - thumbContainer.targetY) > 20) {
+                if (!thumbContainer.tilePressed)
+                    return
+
+                var dx = event.x - startX
+                var dy = event.y - startY
+                var distance = Math.abs(dx) + Math.abs(dy)
+
+                if (!thumbContainer.dragMode && distance > 18)
+                    longPressTimer.stop()
+
+                if (thumbContainer.dragMode) {
+                    var point = eventPoint(event)
+                    dx = point.x - startSceneX
+                    dy = point.y - startSceneY
+                    thumbContainer.x = startItemX + dx
+                    thumbContainer.y = startItemY + dy
                     dragMoved = true
+                    return
                 }
-                if (!swipeTriggered && dy < -80 && Math.abs(dx) < 180 && Math.abs(dy) > (Math.abs(dx) * 0.8)) {
+
+                var upwardIntent = dy < -12 && Math.abs(dy) > Math.abs(dx) * 0.8
+                if (upwardIntent) {
+                    thumbContainer.swipePreview = true
+                    thumbContainer.x = startItemX
+                    thumbContainer.y = startItemY + Math.min(0, dy)
+                    if (Math.abs(dy) > 24)
+                        dragMoved = true
+                } else {
+                    thumbContainer.swipePreview = false
+                    thumbContainer.x = startItemX
+                    thumbContainer.y = startItemY
+                }
+
+                if (!swipeTriggered && dy < -90 && Math.abs(dx) < 170 && Math.abs(dy) > (Math.abs(dx) * 0.9)) {
                     swipeTriggered = true
                     thumbContainer.closeWindow()
                 }
@@ -260,27 +323,34 @@ Item {
             onReleased: {
                 var targetWorkspace = (exposeRoot ? exposeRoot.draggingTargetWorkspace : -1)
                 var currentWorkspace = (hWin && hWin.workspace) ? hWin.workspace.id : -1
-                if (!swipeTriggered && exposeRoot && targetWorkspace > 0 && targetWorkspace !== currentWorkspace && thumbContainer.windowAddress) {
+                if (!swipeTriggered && thumbContainer.dragMode && exposeRoot && targetWorkspace > 0 && targetWorkspace !== currentWorkspace && thumbContainer.windowAddress) {
                     exposeRoot.moveWindowToWorkspace(thumbContainer.windowAddress, targetWorkspace)
                 }
                 Qt.callLater(function() {
-                    thumbContainer.Drag.active = false
-                    if (exposeRoot) {
-                        exposeRoot.draggingFromWorkspace = -1
-                        exposeRoot.draggingTargetWorkspace = -1
-                    }
+                    dragArea.resetGestureState()
                     thumbContainer.x = thumbContainer.targetX
                     thumbContainer.y = thumbContainer.targetY
                 })
             }
             onCanceled: {
-                thumbContainer.Drag.active = false
-                if (exposeRoot) {
-                    exposeRoot.draggingFromWorkspace = -1
-                    exposeRoot.draggingTargetWorkspace = -1
-                }
+                dragArea.resetGestureState()
                 thumbContainer.x = thumbContainer.targetX
                 thumbContainer.y = thumbContainer.targetY
+            }
+
+            Timer {
+                id: longPressTimer
+                interval: 420
+                repeat: false
+                onTriggered: {
+                    if (!thumbContainer.tilePressed)
+                        return
+                    thumbContainer.dragMode = true
+                    thumbContainer.swipePreview = false
+                    if (exposeRoot)
+                        exposeRoot.draggingFromWorkspace = thumbContainer.currentWorkspaceId()
+                    thumbContainer.Drag.active = true
+                }
             }
         }
 
@@ -314,9 +384,136 @@ Item {
                 Rectangle {
                     anchors.fill: parent
                     color: thumbContainer.hovered ? "transparent": "#33000000"
-                    border.width : thumbContainer.hovered ? 3 : 1
-                    border.color : thumbContainer.hovered ? "#ff0088cc" : "#cc444444"
+                    border.width : (thumbContainer.hovered || thumbContainer.dragMode || thumbContainer.swipePreview) ? 2 : 1
+                    border.color : exposeRoot
+                        ? ((thumbContainer.hovered || thumbContainer.dragMode || thumbContainer.swipePreview) ? exposeRoot.dmsPrimary : exposeRoot.dmsOutline)
+                        : ((thumbContainer.hovered || thumbContainer.dragMode || thumbContainer.swipePreview) ? "#ff0088cc" : "#cc444444")
                     radius: 16
+                }
+            }
+        }
+
+        Rectangle {
+            id: titleBar
+            z: 120
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            height: Math.max(34, Math.min(42, thumbContainer.height * 0.14))
+            anchors.leftMargin: 2
+            anchors.rightMargin: 2
+            anchors.topMargin: 2
+            radius: 12
+            clip: true
+            color: exposeRoot ? exposeRoot.withAlpha(exposeRoot.dmsSurfaceContainer, 0.94) : "#dd111111"
+            border.width: 1
+            border.color: exposeRoot ? exposeRoot.dmsOutline : "#55333333"
+
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: 1
+                color: exposeRoot ? exposeRoot.withAlpha(exposeRoot.dmsOutline, 0.65) : "#55ffffff"
+            }
+
+            Rectangle {
+                id: workspaceChip
+                width: Math.max(44, workspaceLabel.implicitWidth + 16)
+                height: Math.max(24, titleBar.height - 10)
+                radius: height / 2
+                anchors.left: parent.left
+                anchors.leftMargin: 8
+                anchors.verticalCenter: parent.verticalCenter
+                color: exposeRoot ? exposeRoot.withAlpha(exposeRoot.dmsSurface, 0.76) : "#66000000"
+                border.width: 1
+                border.color: exposeRoot ? exposeRoot.dmsOutline : "#66ffffff"
+
+                Text {
+                    id: workspaceLabel
+                    anchors.centerIn: parent
+                    text: "WS " + Math.max(1, thumbContainer.currentWorkspaceId())
+                    color: exposeRoot ? exposeRoot.dmsOnSurface : "white"
+                    font.pixelSize: 12
+                    font.bold: true
+                }
+            }
+
+            Rectangle {
+                id: closeButton
+                width: Math.min(30, titleBar.height - 8)
+                height: width
+                radius: width / 2
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.rightMargin: 8
+                color: closeMouse.pressed
+                    ? (exposeRoot ? exposeRoot.dmsPrimary : "#ffffffff")
+                    : (exposeRoot ? exposeRoot.withAlpha(exposeRoot.dmsSurface, 0.72) : "#66000000")
+                border.width: 1
+                border.color: exposeRoot ? exposeRoot.dmsPrimary : "#88ffffff"
+
+                Text {
+                    anchors.centerIn: parent
+                    text: "x"
+                    color: closeMouse.pressed
+                        ? (exposeRoot ? exposeRoot.dmsSurface : "black")
+                        : (exposeRoot ? exposeRoot.dmsOnSurface : "white")
+                    font.pixelSize: 16
+                    font.bold: true
+                }
+
+                MouseArea {
+                    id: closeMouse
+                    anchors.fill: parent
+                    onClicked: {
+                        thumbContainer.closeWindow()
+                    }
+                }
+            }
+
+            MouseArea {
+                id: titleBarGesture
+                anchors.left: parent.left
+                anchors.right: closeButton.left
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                anchors.rightMargin: 8
+                anchors.leftMargin: workspaceChip.width + 14
+                acceptedButtons: Qt.LeftButton
+
+                property real startSceneX: 0
+                property real startSceneY: 0
+                property bool handled: false
+
+                function eventPoint(event) {
+                    return titleBarGesture.mapToItem(null, event.x, event.y)
+                }
+
+                onPressed: event => {
+                    var point = eventPoint(event)
+                    startSceneX = point.x
+                    startSceneY = point.y
+                    handled = false
+                }
+
+                onReleased: event => {
+                    if (handled)
+                        return
+                    var point = eventPoint(event)
+                    var dx = point.x - startSceneX
+                    var dy = point.y - startSceneY
+                    if (Math.abs(dx) < 64 || Math.abs(dx) < Math.abs(dy) * 1.25)
+                        return
+
+                    var currentWorkspace = thumbContainer.currentWorkspaceId()
+                    if (dx < 0) {
+                        if (currentWorkspace > 1)
+                            thumbContainer.sendToWorkspace(currentWorkspace - 1)
+                    } else if (currentWorkspace > 0) {
+                        thumbContainer.sendToWorkspace(currentWorkspace + 1)
+                    }
+                    handled = true
                 }
             }
         }

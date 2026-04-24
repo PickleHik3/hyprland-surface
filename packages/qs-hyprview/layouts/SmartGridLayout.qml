@@ -4,6 +4,97 @@ import Quickshell
 Singleton {
     id: root
 
+    function bestGridForRegion(items, regionW, regionH, gap, isPortrait, targetAspect) {
+        var count = items.length
+        var best = {
+            cols: 1,
+            rows: 1,
+            score: 0
+        }
+
+        for (var cols = 1; cols <= count; cols++) {
+            var rows = Math.ceil(count / cols)
+            var availW = regionW - gap * (cols - 1)
+            var availH = regionH - gap * (rows - 1)
+            if (availW <= 0 || availH <= 0)
+                continue
+
+            var cellW = availW / cols
+            var cellH = availH / rows
+            var scaleW = cellW / targetAspect
+            var scaleH = cellH / 1.0
+            var score = Math.min(scaleW, scaleH)
+            if (score > best.score) {
+                best.cols = cols
+                best.rows = rows
+                best.score = score
+            }
+        }
+
+        return best
+    }
+
+    function layoutWorkspaceGroup(items, regionX, regionY, regionW, regionH, gap, isPortrait, targetAspect) {
+        var output = []
+        if (!items || items.length === 0)
+            return output
+
+        var grid = bestGridForRegion(items, regionW, regionH, gap, isPortrait, targetAspect)
+        var cols = grid.cols
+        var rows = grid.rows
+
+        var availW = regionW - gap * (cols - 1)
+        var availH = regionH - gap * (rows - 1)
+        var maxCellW = availW / cols
+        var maxCellH = availH / rows
+
+        for (var r = 0; r < rows; r++) {
+            var startIndex = r * cols
+            var endIndex = Math.min(startIndex + cols, items.length)
+            if (startIndex >= items.length)
+                break
+
+            var rowItems = []
+            var totalRowWidth = 0
+            for (var i = startIndex; i < endIndex; i++) {
+                var item = items[i]
+                var w0 = (item.width && item.width > 0) ? item.width : 100
+                var h0 = (item.height && item.height > 0) ? item.height : 100
+                var scale = Math.min(maxCellW / w0, maxCellH / h0)
+                var thumbW = w0 * scale
+                var thumbH = h0 * scale
+
+                rowItems.push({
+                    item: item,
+                    width: thumbW,
+                    height: thumbH
+                })
+                totalRowWidth += thumbW
+            }
+
+            if (rowItems.length > 1)
+                totalRowWidth += (rowItems.length - 1) * gap
+
+            var currentX = regionX + (regionW - totalRowWidth) / 2
+            var rowY = regionY + r * (maxCellH + gap)
+            for (var k = 0; k < rowItems.length; k++) {
+                var rItem = rowItems[k]
+                var currentY = rowY + (maxCellH - rItem.height) / 2
+                output.push({
+                    win: rItem.item.win,
+                    x: currentX,
+                    y: currentY,
+                    width: rItem.width,
+                    height: rItem.height,
+                    workspaceId: rItem.item.workspaceId
+                })
+                currentX += rItem.width + gap
+            }
+        }
+
+        return output
+    }
+
     function doLayout(windowList, outerWidth, outerHeight) {
         var N = windowList.length
         if (N === 0) return []
@@ -18,117 +109,45 @@ Singleton {
         var usableW = outerWidth * contentScale
         var usableH = outerHeight * contentScale
 
-        // --- 1. TROVARE LA SCALA OTTIMALE ---
-        // Usiamo usableW/H per decidere la dimensione delle finestre
-        // Portrait screens prefer taller cells to avoid tiny thumbnails.
+        // Workspace-aware packing: each workspace gets a horizontal band.
+        // This keeps left-to-right ordering by workspace ID.
         var TARGET_ASPECT = isPortrait ? (10.0 / 16.0) : (16.0 / 9.0)
-        var bestCols = 1
-        var bestRows = 1
-        var bestScale = 0
-
-        for (var cols = 1; cols <= N; cols++) {
-            var rows = Math.ceil(N / cols)
-
-            // Calcoliamo lo spazio basandoci sull'area ridotta
-            var availW = usableW - gap * (cols - 1)
-            var availH = usableH - gap * (rows - 1)
-
-            if (availW <= 0 || availH <= 0) continue
-
-            var cellW = availW / cols
-            var cellH = availH / rows
-
-            var scaleW = cellW / TARGET_ASPECT
-            var scaleH = cellH / 1.0
-            var currentScale = Math.min(scaleW, scaleH)
-
-            if (currentScale > bestScale) {
-                bestScale = currentScale
-                bestCols = cols
-                bestRows = rows
+        var groups = {}
+        var workspaceIds = []
+        for (var wi = 0; wi < N; wi++) {
+            var ws = Number(windowList[wi].workspaceId)
+            if (!isFinite(ws) || ws < 1)
+                ws = 1
+            if (!groups[ws]) {
+                groups[ws] = []
+                workspaceIds.push(ws)
             }
+            groups[ws].push(windowList[wi])
         }
+        workspaceIds.sort(function(a, b) { return a - b })
 
-        // --- 2. CALCOLO DIMENSIONI REALI ---
-
-        // Ricalcoliamo i limiti cella basati sull'area ridotta
-        var finalAvailW = usableW - gap * (bestCols - 1)
-        var finalAvailH = usableH - gap * (bestRows - 1)
-        var maxCellW = finalAvailW / bestCols
-        var maxCellH = finalAvailH / bestRows
-
-        // --- 3. POSIZIONAMENTO (CENTRATO NELL'AREA TOTALE) ---
-
-        // Calcoliamo l'altezza totale del blocco di contenuto
-        var totalGridContentH = bestRows * maxCellH + (bestRows - 1) * gap
-
-        // Per centrare verticalmente, usiamo l'outerHeight REALE (al 100%)
-        // In questo modo il blocco ridotto (90%) finisce esattamente al centro dello schermo fisico
-        var startOffsetY = (outerHeight - totalGridContentH) / 2
+        var bandCount = workspaceIds.length
+        var totalBandGap = gap * Math.max(0, bandCount - 1)
+        var bandW = (usableW - totalBandGap) / Math.max(1, bandCount)
+        var startX = (outerWidth - usableW) / 2
+        var startY = (outerHeight - usableH) / 2
 
         var result = []
-
-        // Iteriamo per RIGA
-        for (var r = 0; r < bestRows; r++) {
-            var rowItems = []
-            var startIndex = r * bestCols
-            var endIndex = Math.min(startIndex + bestCols, N)
-
-            if (startIndex >= N) break
-
-            var totalRowContentWidth = 0
-
-            // Fase 3a: Calcolo dimensioni miniature (Packed)
-            for (var i = startIndex; i < endIndex; i++) {
-                var item = windowList[i]
-                var w0 = (item.width && item.width > 0) ? item.width : 100
-                var h0 = (item.height && item.height > 0) ? item.height : 100
-
-                // Scala calcolata sui limiti "sicuri" (90%)
-                var scale = Math.min(maxCellW / w0, maxCellH / h0)
-
-                var thumbW = w0 * scale
-                var thumbH = h0 * scale
-
-                rowItems.push({
-                    originalItem: item,
-                    width: thumbW,
-                    height: thumbH,
-                    index: i,
-                    col: i - startIndex
-                })
-
-                totalRowContentWidth += thumbW
-            }
-
-            // Aggiungiamo i gap totali della riga
-            if (rowItems.length > 1) {
-                totalRowContentWidth += (rowItems.length - 1) * gap
-            }
-
-            // Fase 3b: Posizionamento X
-            // Anche qui, usiamo outerWidth REALE per centrare il blocco riga nello schermo intero
-            var currentX = (outerWidth - totalRowContentWidth) / 2
-            var cellAbsY = startOffsetY + r * (maxCellH + gap)
-
-            for (var k = 0; k < rowItems.length; k++) {
-                var rItem = rowItems[k]
-
-                // Centratura verticale nella fascia
-                var currentY = cellAbsY + (maxCellH - rItem.height) / 2
-
-                result.push({
-                    win: rItem.originalItem.win,
-                    x: currentX,
-                    y: currentY,
-                    width: rItem.width,
-                    height: rItem.height,
-                    rowIndex: r,
-                    colIndex: rItem.col
-                })
-
-                currentX += rItem.width + gap
-            }
+        for (var bi = 0; bi < workspaceIds.length; bi++) {
+            var workspaceId = workspaceIds[bi]
+            var regionX = startX + bi * (bandW + gap)
+            var groupResult = layoutWorkspaceGroup(
+                groups[workspaceId],
+                regionX,
+                startY,
+                bandW,
+                usableH,
+                gap,
+                isPortrait,
+                TARGET_ASPECT
+            )
+            for (var gi = 0; gi < groupResult.length; gi++)
+                result.push(groupResult[gi])
         }
 
         return result

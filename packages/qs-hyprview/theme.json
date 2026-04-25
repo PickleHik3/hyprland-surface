@@ -1,0 +1,16 @@
+{
+  "surface": "#121212",
+  "surfaceContainerLow": "#1b1b1f",
+  "surfaceContainerHigh": "#25262b",
+  "surfaceContainerHighest": "#303136",
+  "surfaceVariant": "#45474d",
+  "primary": "#8cb8ff",
+  "primaryContainer": "#2c4668",
+  "onPrimaryContainer": "#f3f7ff",
+  "outline": "#547197",
+  "outlineVariant": "#45474d",
+  "foreground": "#f3f7ff",
+  "onSurfaceVariant": "#9fb0c8",
+  "backgroundTint": "#1b1b1f",
+  "accent": "#2c4668"
+}

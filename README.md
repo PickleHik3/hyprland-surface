@@ -2,6 +2,14 @@
 
 Packaged Surface Pro 7 Hyprland tablet setup around Dank Material Shell.
 
+## Overview
+
+`qs-hyprview` is the packaged recent-apps overview. It shows open windows
+across workspaces, supports drag-to-workspace moves, and follows the active DMS
+palette through the bundled `matugen` template.
+
+![qs-hyprview overview](docs/images/qs-hyprview-overview.png)
+
 ## Layout
 
 ```text
@@ -38,7 +46,8 @@ Install these separately before using the packaged Hypr config:
 
 Install these only if you want the matching integration:
 
-- `hyprgrass`, for the packaged gesture binding that opens recent apps
+- [`hyprgrass`](https://github.com/horriblename/hyprgrass), for the packaged
+  gesture binding that opens recent apps
 - `sddm-silent-theme`, for the packaged SDDM theme files
 
 ## Install
@@ -58,7 +67,8 @@ Component scope:
   files, builds the custom binary, and enables `wvkbd.service` plus
   `fcitx-wvkbd-auto.service`
 - `install-qs-hyprview.sh`: deploys `packages/qs-hyprview` and enables
-  `qs-hyprview.service`
+  `qs-hyprview.service`, and registers the repo's `matugen` template so DMS can
+  generate `qs-hyprview/theme.json` on theme and wallpaper changes
 - `install-surface-dms.sh`: deploys the DMS plugin and restarts DMS if present
 - `install-hypr-config.sh`: merges the packaged Hyprland config into
   `~/.config/hypr`
@@ -94,8 +104,17 @@ It also builds the custom `wvkbd` binary and enables:
 
 The packaged Hypr config starts DMS, Fcitx, and `iio-hyprland`. If `hyprgrass`
 is installed, the packaged gesture binding opens recent apps through
-`quickshell ipc`. The custom keyboard itself is owned by `wvkbd.service`, not
-by a Hypr `exec-once` line.
+`quickshell ipc`. `install-qs-hyprview.sh` also registers a `matugen` template
+for `~/.config/hypr/apps/qs-hyprview/theme.json`, so the overview can follow
+the active DMS palette without reading Hyprland config. The custom keyboard
+itself is owned by `wvkbd.service`, not by a Hypr `exec-once` line.
+
+Example [`hyprgrass`](https://github.com/horriblename/hyprgrass) binding for
+swipe up from the bottom edge:
+
+```ini
+hyprgrass-bind = , edge:d:u, exec, quickshell ipc -p ~/.config/hypr/apps/qs-hyprview call expose open smartgrid
+```
 
 If this is the first time installing the Fcitx environment files, restart the
 user session after installation.

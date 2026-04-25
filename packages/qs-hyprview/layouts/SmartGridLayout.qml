@@ -4,12 +4,11 @@ import Quickshell
 Singleton {
     id: root
 
-    function bestGridForRegion(items, regionW, regionH, gap, isPortrait, targetAspect) {
-        var count = items.length
+    function bestGridForRegion(count, regionW, regionH, gap, targetAspect, preferredCols) {
         var best = {
             cols: 1,
             rows: 1,
-            score: 0
+            score: -1
         }
 
         for (var cols = 1; cols <= count; cols++) {
@@ -21,9 +20,11 @@ Singleton {
 
             var cellW = availW / cols
             var cellH = availH / rows
-            var scaleW = cellW / targetAspect
-            var scaleH = cellH / 1.0
-            var score = Math.min(scaleW, scaleH)
+            var aspectPenalty = Math.abs((cellW / Math.max(1, cellH)) - targetAspect)
+            var sizeScore = Math.min(cellW / targetAspect, cellH)
+            var columnPenalty = preferredCols > 0 ? Math.abs(cols - preferredCols) * 42 : 0
+            var rowPenalty = Math.abs(rows - cols) * 5
+            var score = sizeScore - (aspectPenalty * 120) - columnPenalty - rowPenalty
             if (score > best.score) {
                 best.cols = cols
                 best.rows = rows
@@ -34,12 +35,12 @@ Singleton {
         return best
     }
 
-    function layoutWorkspaceGroup(items, regionX, regionY, regionW, regionH, gap, isPortrait, targetAspect) {
+    function layoutGrid(items, regionX, regionY, regionW, regionH, gap, targetAspect, preferredCols) {
         var output = []
         if (!items || items.length === 0)
             return output
 
-        var grid = bestGridForRegion(items, regionW, regionH, gap, isPortrait, targetAspect)
+        var grid = bestGridForRegion(items.length, regionW, regionH, gap, targetAspect, preferredCols)
         var cols = grid.cols
         var rows = grid.rows
 
@@ -47,6 +48,16 @@ Singleton {
         var availH = regionH - gap * (rows - 1)
         var maxCellW = availW / cols
         var maxCellH = availH / rows
+        var cardW = maxCellW
+        var cardH = cardW / targetAspect
+
+        if (cardH > maxCellH) {
+            cardH = maxCellH
+            cardW = cardH * targetAspect
+        }
+
+        var totalGridHeight = (rows * cardH) + (Math.max(0, rows - 1) * gap)
+        var gridStartY = regionY + Math.max(0, (regionH - totalGridHeight) / 2)
 
         for (var r = 0; r < rows; r++) {
             var startIndex = r * cols
@@ -55,40 +66,23 @@ Singleton {
                 break
 
             var rowItems = []
-            var totalRowWidth = 0
-            for (var i = startIndex; i < endIndex; i++) {
-                var item = items[i]
-                var w0 = (item.width && item.width > 0) ? item.width : 100
-                var h0 = (item.height && item.height > 0) ? item.height : 100
-                var scale = Math.min(maxCellW / w0, maxCellH / h0)
-                var thumbW = w0 * scale
-                var thumbH = h0 * scale
+            for (var i = startIndex; i < endIndex; i++)
+                rowItems.push(items[i])
 
-                rowItems.push({
-                    item: item,
-                    width: thumbW,
-                    height: thumbH
-                })
-                totalRowWidth += thumbW
-            }
-
-            if (rowItems.length > 1)
-                totalRowWidth += (rowItems.length - 1) * gap
-
+            var totalRowWidth = (rowItems.length * cardW) + (Math.max(0, rowItems.length - 1) * gap)
             var currentX = regionX + (regionW - totalRowWidth) / 2
-            var rowY = regionY + r * (maxCellH + gap)
+            var rowY = gridStartY + r * (cardH + gap)
             for (var k = 0; k < rowItems.length; k++) {
-                var rItem = rowItems[k]
-                var currentY = rowY + (maxCellH - rItem.height) / 2
+                var item = rowItems[k]
                 output.push({
-                    win: rItem.item.win,
+                    win: item.win,
                     x: currentX,
-                    y: currentY,
-                    width: rItem.width,
-                    height: rItem.height,
-                    workspaceId: rItem.item.workspaceId
+                    y: rowY,
+                    width: cardW,
+                    height: cardH,
+                    workspaceId: item.workspaceId
                 })
-                currentX += rItem.width + gap
+                currentX += cardW + gap
             }
         }
 
@@ -101,55 +95,45 @@ Singleton {
         if (outerWidth <= 0 || outerHeight <= 0) return []
 
         var isPortrait = outerHeight > outerWidth
-        var gap = Math.min(outerWidth * (isPortrait ? 0.022 : 0.03), outerHeight * (isPortrait ? 0.022 : 0.03))
+        var gap = Math.round(Math.min(outerWidth * (isPortrait ? 0.016 : 0.012), outerHeight * (isPortrait ? 0.015 : 0.013)))
+        var usableW = outerWidth * (isPortrait ? 0.92 : 0.94)
+        var usableH = outerHeight * (isPortrait ? 0.9 : 0.94)
+        var targetAspect = isPortrait ? 0.84 : 1.08
+        var preferredCols
 
-        // --- 0. DEFINIZIONE AREA SICURA (SCALATA) ---
-        // Riduciamo l'area di calcolo al 90% per lasciare spazio alle animazioni hover
-        var contentScale = isPortrait ? 0.94 : 0.9
-        var usableW = outerWidth * contentScale
-        var usableH = outerHeight * contentScale
-
-        // Workspace-aware packing: each workspace gets a horizontal band.
-        // This keeps left-to-right ordering by workspace ID.
-        var TARGET_ASPECT = isPortrait ? (10.0 / 16.0) : (16.0 / 9.0)
-        var groups = {}
-        var workspaceIds = []
-        for (var wi = 0; wi < N; wi++) {
-            var ws = Number(windowList[wi].workspaceId)
-            if (!isFinite(ws) || ws < 1)
-                ws = 1
-            if (!groups[ws]) {
-                groups[ws] = []
-                workspaceIds.push(ws)
-            }
-            groups[ws].push(windowList[wi])
-        }
-        workspaceIds.sort(function(a, b) { return a - b })
-
-        var bandCount = workspaceIds.length
-        var totalBandGap = gap * Math.max(0, bandCount - 1)
-        var bandW = (usableW - totalBandGap) / Math.max(1, bandCount)
-        var startX = (outerWidth - usableW) / 2
-        var startY = (outerHeight - usableH) / 2
-
-        var result = []
-        for (var bi = 0; bi < workspaceIds.length; bi++) {
-            var workspaceId = workspaceIds[bi]
-            var regionX = startX + bi * (bandW + gap)
-            var groupResult = layoutWorkspaceGroup(
-                groups[workspaceId],
-                regionX,
-                startY,
-                bandW,
-                usableH,
-                gap,
-                isPortrait,
-                TARGET_ASPECT
-            )
-            for (var gi = 0; gi < groupResult.length; gi++)
-                result.push(groupResult[gi])
+        if (isPortrait) {
+            preferredCols = N <= 2 ? 1 : 2
+        } else {
+            if (N <= 1)
+                preferredCols = 1
+            else if (N <= 4)
+                preferredCols = 2
+            else if (N <= 8)
+                preferredCols = 3
+            else
+                preferredCols = 4
         }
 
-        return result
+        var sorted = windowList.slice(0)
+        sorted.sort(function(a, b) {
+            var aws = Number(a.workspaceId || 1)
+            var bws = Number(b.workspaceId || 1)
+            if (aws !== bws)
+                return aws - bws
+            var ai = Number(a.originalIndex || 0)
+            var bi = Number(b.originalIndex || 0)
+            return ai - bi
+        })
+
+        return layoutGrid(
+            sorted,
+            (outerWidth - usableW) / 2,
+            (outerHeight - usableH) / 2,
+            usableW,
+            usableH,
+            gap,
+            targetAspect,
+            preferredCols
+        )
     }
 }

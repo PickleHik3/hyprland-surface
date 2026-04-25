@@ -29,8 +29,109 @@ PanelWindow {
     property bool efficientMode: true
     property int refreshCursor: 0
     readonly property int thumbCount: winRepeater.count
-    property int edgePadding: 40
+    property int edgePadding: 48
+    property int persistentWorkspaceCount: 4
+    property int stageMaxWidth: 1640
     readonly property bool dynamicLiveCapture: efficientMode && isActive && thumbCount <= 8
+    property color dmsSurface: Palette.surfaceContainerLow ? Palette.surfaceContainerLow : "#1b1b1f"
+    property color dmsSurfaceContainer: Palette.surfaceContainerHigh ? Palette.surfaceContainerHigh : "#25262b"
+    property color dmsSurfaceRaised: Palette.surfaceContainerHighest ? Palette.surfaceContainerHighest : "#303136"
+    property color dmsSurfaceVariant: Palette.surfaceVariant ? Palette.surfaceVariant : "#45474d"
+    property color dmsPrimary: Palette.primary ? Palette.primary : "#8cb8ff"
+    property color dmsPrimaryContainer: Palette.primaryContainer ? Palette.primaryContainer : "#2c4668"
+    property color dmsOnPrimaryContainer: Palette.primaryContainerForeground ? Palette.primaryContainerForeground : "#f3f7ff"
+    property color dmsOutline: Palette.outline ? Palette.outline : "#547197"
+    property color dmsOutlineVariant: Palette.outlineVariant ? Palette.outlineVariant : "#45474d"
+    property color dmsOnSurface: Palette.foreground ? Palette.foreground : "#f3f7ff"
+    property color dmsMutedText: Palette.mutedForeground ? Palette.mutedForeground : "#9fb0c8"
+    property color overviewTint: Palette.backgroundTint ? Palette.backgroundTint : "#1b1b1f"
+    property color overviewAccent: Palette.primaryContainer ? Palette.primaryContainer : "#2c4668"
+    readonly property var workspaceTargets: {
+        var counts = {}
+        var extras = []
+        var maxWorkspaceId = Math.max(root.persistentWorkspaceCount, root.activeWorkspaceId)
+        var values = Hyprland.toplevels ? Hyprland.toplevels.values : []
+
+        if (values) {
+            for (var i = 0; i < values.length; ++i) {
+                var win = values[i]
+                var info = win && win.lastIpcObject ? win.lastIpcObject : {}
+                var workspace = info && info.workspace ? info.workspace : null
+                var workspaceId = workspace && workspace.id !== undefined ? Number(workspace.id) : -1
+                if (workspaceId < 1)
+                    continue
+                counts[workspaceId] = (counts[workspaceId] || 0) + 1
+                if (workspaceId > maxWorkspaceId)
+                    maxWorkspaceId = workspaceId
+            }
+        }
+
+        for (var workspaceKey in counts) {
+            var numericId = Number(workspaceKey)
+            if (numericId > root.persistentWorkspaceCount && extras.indexOf(numericId) === -1)
+                extras.push(numericId)
+        }
+
+        if (root.activeWorkspaceId > root.persistentWorkspaceCount && extras.indexOf(root.activeWorkspaceId) === -1)
+            extras.push(root.activeWorkspaceId)
+
+        extras.sort(function(a, b) { return a - b })
+
+        var result = []
+        for (var id = 1; id <= root.persistentWorkspaceCount; ++id) {
+            result.push({
+                id: id,
+                label: String(id),
+                count: counts[id] || 0,
+                isNew: false
+            })
+        }
+
+        for (var extraIndex = 0; extraIndex < extras.length; ++extraIndex) {
+            var extraId = extras[extraIndex]
+            result.push({
+                id: extraId,
+                label: String(extraId),
+                count: counts[extraId] || 0,
+                isNew: false
+            })
+        }
+
+        result.push({
+            id: Math.max(root.persistentWorkspaceCount + 1, maxWorkspaceId + 1),
+            label: "+",
+            count: 0,
+            isNew: true
+        })
+
+        return result
+    }
+
+    function withAlpha(colorValue, alphaValue) {
+        return Qt.rgba(colorValue.r, colorValue.g, colorValue.b, Math.max(0, Math.min(1, alphaValue)))
+    }
+
+    function highestWorkspaceId() {
+        var maxId = Math.max(1, root.activeWorkspaceId)
+        var values = Hyprland.toplevels ? Hyprland.toplevels.values : []
+        if (!values)
+            return maxId
+        for (var i = 0; i < values.length; ++i) {
+            var win = values[i]
+            var info = win && win.lastIpcObject ? win.lastIpcObject : {}
+            var workspace = info && info.workspace ? info.workspace : null
+            var workspaceId = workspace && workspace.id !== undefined ? Number(workspace.id) : -1
+            if (workspaceId > maxId)
+                maxId = workspaceId
+        }
+        return maxId
+    }
+
+    function switchWorkspace(workspaceId) {
+        if (workspaceId < 1)
+            return
+        Hyprland.dispatch(`workspace ${workspaceId}`)
+    }
 
     anchors { top: true; bottom: true; left: true; right: true }
     color: "transparent"
@@ -119,7 +220,6 @@ PanelWindow {
             root.refreshCursor = 0
 
             exposeArea.currentIndex = -1
-            searchBox.reset()
             Hyprland.refreshToplevels()
             refreshThumbs(true)
         } else {
@@ -280,6 +380,31 @@ PanelWindow {
             onClicked: root.toggleExpose()
         }
 
+        Rectangle {
+            anchors.fill: parent
+            z: -3
+            color: root.withAlpha(root.overviewTint, 0.60)
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            z: -2
+            gradient: Gradient {
+                GradientStop {
+                    position: 0.0
+                    color: root.withAlpha(root.overviewAccent, 0.10)
+                }
+                GradientStop {
+                    position: 0.45
+                    color: root.withAlpha(root.dmsSurface, 0.10)
+                }
+                GradientStop {
+                    position: 1.0
+                    color: root.withAlpha(root.overviewTint, 0.24)
+                }
+            }
+        }
+
         Item {
             id: layoutContainer
             anchors.fill: parent
@@ -291,439 +416,223 @@ PanelWindow {
                     anchors.margins: 0
                     property int sectionSpacing: 12
 
-                SearchBox {
-                    id: searchBox
-                    width: Math.min(layoutRoot.width * 0.68, 760)
-                    anchors.top: layoutRoot.top
-                    anchors.horizontalCenter: layoutRoot.horizontalCenter
-                    onTextChanged: function(text) {
-                        root.animateWindows = true
-                        exposeArea.searchText = text
-                    }
-                }
-
-                // thumbs area
                 Item {
-                    id: exposeArea
-                    anchors.left: layoutRoot.left
-                    anchors.right: layoutRoot.right
-                    anchors.top: searchBox.bottom
-                    anchors.topMargin: layoutRoot.sectionSpacing
-                    anchors.bottom: workspaceStrip.top
-                    anchors.bottomMargin: layoutRoot.sectionSpacing
+                    id: stageFrame
+                    width: Math.min(layoutRoot.width * 0.9, root.stageMaxWidth)
+                    anchors.horizontalCenter: layoutRoot.horizontalCenter
+                    anchors.top: layoutRoot.top
+                    anchors.topMargin: 18
+                    anchors.bottom: workspaceDock.top
+                    anchors.bottomMargin: 26
+                    z: 10
 
-                    property int currentIndex: 0
-                    property string searchText: ""
+                    // thumbs area
+                    Item {
+                        id: exposeArea
+                        anchors.fill: parent
+                        anchors.margins: 0
+                        property int currentIndex: 0
 
-                    // Reset active thumb on searchText change
-                    onSearchTextChanged: {
-                        currentIndex = (windowLayoutModel.count > 0) ? 0 : -1
-                    }
+                        ScriptModel {
+                            id: windowLayoutModel
 
-                    ScriptModel {
-                        id: windowLayoutModel
+                            property int areaW: exposeArea.width
+                            property int areaH: exposeArea.height
+                            property string algo: root.lastLayoutAlgorithm
+                            property var rawToplevels: Hyprland.toplevels.values
 
-                        property int areaW: exposeArea.width
-                        property int areaH: exposeArea.height
-                        property string query: exposeArea.searchText
-                        property string algo: root.lastLayoutAlgorithm
-                        property var rawToplevels: Hyprland.toplevels.values
+                            values: {
+                                // Bailout on wrong screen size
+                                if (areaW <= 0 || areaH <= 0) return []
 
-                        values: {
-                            // Bailout on wrong screen size
-                            if (areaW <= 0 || areaH <= 0) return []
+                                var windowList = []
+                                var idx = 0
 
-                            var q = (query || "").toLowerCase()
-                            var windowList = []
-                            var idx = 0
+                                if (!rawToplevels) return []
 
-                            if (!rawToplevels) return []
+                                for (var it of rawToplevels) {
+                                    var w = it
+                                    var clientInfo = w && w.lastIpcObject ? w.lastIpcObject : {}
+                                    var workspace = clientInfo && clientInfo.workspace ? clientInfo.workspace : null
+                                    var workspaceId = workspace && workspace.id !== undefined ? workspace.id : undefined
 
-                            for (var it of rawToplevels) {
-                                var w = it
-                                var clientInfo = w && w.lastIpcObject ? w.lastIpcObject : {}
-                                var workspace = clientInfo && clientInfo.workspace ? clientInfo.workspace : null
-                                var workspaceId = workspace && workspace.id !== undefined ? workspace.id : undefined
+                                    // Filter invalid workspace or offscreen windows
+                                    if (workspaceId === undefined || workspaceId === null) continue
+                                    var size = clientInfo && clientInfo.size ? clientInfo.size : [0, 0]
+                                    var at = clientInfo && clientInfo.at ? clientInfo.at : [-1000, -1000]
+                                    if (at[1] + size[1] <= 0) continue
 
-                                // Filter invalid workspace or offscreen windows
-                                if (workspaceId === undefined || workspaceId === null) continue
-                                var size = clientInfo && clientInfo.size ? clientInfo.size : [0, 0]
-                                var at = clientInfo && clientInfo.at ? clientInfo.at : [-1000, -1000]
-                                if (at[1] + size[1] <= 0) continue
-
-                                // Text filtering
-                                var clazz = (clientInfo["class"] || "").toLowerCase()
-                                var ic = (clientInfo.initialClass || "").toLowerCase()
-                                var app = (w.appId || clientInfo.initialClass || "").toLowerCase()
-
-                                if (q.length > 0) {
-                                    var title = (w.title || clientInfo.title || "").toLowerCase()
-                                    var match = title.indexOf(q) !== -1 || clazz.indexOf(q) !== -1 ||
-                                                ic.indexOf(q) !== -1 || app.indexOf(q) !== -1
-                                    if (!match) continue
+                                    windowList.push({
+                                        win: w,
+                                        clientInfo: clientInfo,
+                                        workspaceId: workspaceId,
+                                        width: size[0],
+                                        height: size[1],
+                                        originalIndex: idx++,
+                                        lastIpcObject: w.lastIpcObject
+                                    })
                                 }
 
-                                windowList.push({
-                                    win: w,
-                                    clientInfo: clientInfo,
-                                    workspaceId: workspaceId,
-                                    width: size[0],
-                                    height: size[1],
-                                    originalIndex: idx++,
-                                    lastIpcObject: w.lastIpcObject
+                                windowList.sort(function(a, b) {
+                                    var activeA = Number(a.workspaceId) === root.activeWorkspaceId ? 0 : 1
+                                    var activeB = Number(b.workspaceId) === root.activeWorkspaceId ? 0 : 1
+                                    if (activeA !== activeB)
+                                        return activeA - activeB
+                                    if (a.workspaceId < b.workspaceId) return -1
+                                    if (a.workspaceId > b.workspaceId) return 1
+                                    if (a.originalIndex < b.originalIndex) return -1
+                                    if (a.originalIndex > b.originalIndex) return 1
+                                    return 0
                                 })
+
+                                return LayoutsManager.doLayout(algo, windowList, areaW, areaH)
                             }
-
-                            // Sort by workspaceId, then originalIndex
-                            windowList.sort(function(a, b) {
-                                if (a.workspaceId < b.workspaceId) return -1
-                                if (a.workspaceId > b.workspaceId) return 1
-                                if (a.originalIndex < b.originalIndex) return -1
-                                if (a.originalIndex > b.originalIndex) return 1
-                                return 0
-                            })
-
-                            return LayoutsManager.doLayout(algo, windowList, areaW, areaH)
                         }
-                    }
 
-                    Repeater {
-                        id: winRepeater
-                        model: windowLayoutModel
+                        Repeater {
+                            id: winRepeater
+                            model: windowLayoutModel
 
-                        delegate: WindowThumbnail {
-                            // Model data
-                            hWin: modelData.win
-                            wHandle: hWin.wayland
-                            winKey: String(hWin.address)
-                            thumbW: modelData.width
-                            thumbH: modelData.height
-                            clientInfo: hWin.lastIpcObject
-
-                            // Layout-generated coordinates
-                            targetX: (modelData && modelData.x !== undefined) ? modelData.x : -1000
-                            targetY: (modelData && modelData.y !== undefined) ? modelData.y : -1000
-                            targetZ: (visible && (exposeArea.currentIndex === index)) ? 1000 : ((modelData && modelData.zIndex) ? modelData.zIndex : 0)
-                            targetRotation: (modelData && modelData.rotation) ? modelData.rotation : 0
-                            workspaceId: (modelData && modelData.workspaceId) ? modelData.workspaceId : ((hWin && hWin.workspace) ? hWin.workspace.id : -1)
-
-                            hovered: visible && (exposeArea.currentIndex === index)
-                            moveCursorToActiveWindow: root.moveCursorToActiveWindow
-                            exposeRoot: root
+                            delegate: WindowThumbnail {
+                                hWin: modelData.win
+                                wHandle: hWin.wayland
+                                winKey: String(hWin.address)
+                                thumbW: modelData.width
+                                thumbH: modelData.height
+                                clientInfo: hWin.lastIpcObject
+                                targetX: (modelData && modelData.x !== undefined) ? modelData.x : -1000
+                                targetY: (modelData && modelData.y !== undefined) ? modelData.y : -1000
+                                targetZ: (visible && (exposeArea.currentIndex === index)) ? 1000 : ((modelData && modelData.zIndex) ? modelData.zIndex : 0)
+                                targetRotation: 0
+                                workspaceId: (modelData && modelData.workspaceId) ? modelData.workspaceId : ((hWin && hWin.workspace) ? hWin.workspace.id : -1)
+                                hovered: visible && (exposeArea.currentIndex === index)
+                                moveCursorToActiveWindow: root.moveCursorToActiveWindow
+                                exposeRoot: root
+                            }
                         }
                     }
                 }
 
-                Rectangle {
-                    id: workspaceStrip
-                    readonly property bool isPortrait: root.height > root.width
-                    property int workspaceRows: workspaceRepeater.count <= 3 ? 1 : 2
-                    property int gridSpacing: 10
-                    property int cardHeightSingleRow: 108
-                    property int cardHeightDoubleRow: 92
-                    readonly property int cardHeightDynamic: workspaceRows === 1 ? cardHeightSingleRow : cardHeightDoubleRow
-                    width: layoutRoot.width
-                    implicitWidth: layoutRoot.width
-                    implicitHeight: (workspaceRows * cardHeightDynamic) + ((workspaceRows - 1) * gridSpacing) + 28
-                    radius: 18
-                    anchors.left: layoutRoot.left
-                    anchors.right: layoutRoot.right
+                Item {
+                    id: workspaceDock
+                    width: Math.min(layoutRoot.width * 0.52, 560)
+                    anchors.horizontalCenter: layoutRoot.horizontalCenter
                     anchors.bottom: layoutRoot.bottom
-                    color: "#73101420"
-                    border.width: 1
-                    border.color: "#335b6780"
+                    anchors.bottomMargin: 12
+                    height: 94
+                    z: 40
 
-                    ScriptModel {
-                        id: workspaceModel
-                        property var rawToplevels: Hyprland.toplevels ? Hyprland.toplevels.values : []
+                    Column {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.bottom: parent.bottom
+                        spacing: 10
 
-                        values: {
-                            if (!rawToplevels) return []
-
-                            function friendlyAppName(rawClass) {
-                                var cls = String(rawClass || "").trim()
-                                if (cls.length > 0) {
-                                    cls = cls.split(".").pop()
-                                    cls = cls.split("-").pop()
-                                    cls = cls.replace(/[_-]+/g, " ")
-                                    if (cls.length > 0) {
-                                        return cls.charAt(0).toUpperCase() + cls.slice(1)
-                                    }
-                                }
-                                return "App"
-                            }
-
-                            var workspaceWindows = {}
-                            var occupiedIds = []
-                            var maxWorkspaceId = Math.max(1, root.activeWorkspaceId)
-
-                            for (var w of rawToplevels) {
-                                var clientInfo = w && w.lastIpcObject ? w.lastIpcObject : {}
-                                var workspace = clientInfo && clientInfo.workspace ? clientInfo.workspace : null
-                                var workspaceId = workspace && workspace.id !== undefined ? workspace.id : null
-                                if (workspaceId === null || workspaceId < 1) continue
-
-                                if (!workspaceWindows[workspaceId]) {
-                                    workspaceWindows[workspaceId] = []
-                                    occupiedIds.push(workspaceId)
-                                }
-
-                                var atX = Number(clientInfo.at && clientInfo.at[0] !== undefined ? clientInfo.at[0] : 0)
-                                var atY = Number(clientInfo.at && clientInfo.at[1] !== undefined ? clientInfo.at[1] : 0)
-                                var sizeW = Math.max(1, Number(clientInfo.size && clientInfo.size[0] !== undefined ? clientInfo.size[0] : 1))
-                                var sizeH = Math.max(1, Number(clientInfo.size && clientInfo.size[1] !== undefined ? clientInfo.size[1] : 1))
-
-                                workspaceWindows[workspaceId].push({
-                                    address: w.address,
-                                    clazz: String(clientInfo["class"] || clientInfo.initialClass || w.appId || ""),
-                                    appName: friendlyAppName(clientInfo["class"] || clientInfo.initialClass || w.appId || ""),
-                                    atX: atX,
-                                    atY: atY,
-                                    sizeW: sizeW,
-                                    sizeH: sizeH
-                                })
-                                if (workspaceId > maxWorkspaceId) maxWorkspaceId = workspaceId
-                            }
-
-                            if (root.activeWorkspaceId > 0 && occupiedIds.indexOf(root.activeWorkspaceId) === -1) {
-                                occupiedIds.push(root.activeWorkspaceId)
-                            }
-
-                            occupiedIds.sort(function(a, b) { return a - b })
-                            var extraWorkspaceId = maxWorkspaceId + 1
-                            if (occupiedIds.indexOf(extraWorkspaceId) === -1) {
-                                occupiedIds.push(extraWorkspaceId)
-                            }
-
-                            var result = []
-                            for (var id of occupiedIds) {
-                                var wins = workspaceWindows[id] || []
-                                var layoutTiles = []
-
-                                if (wins.length > 0) {
-                                    var minX = wins[0].atX
-                                    var minY = wins[0].atY
-                                    var maxX = wins[0].atX + wins[0].sizeW
-                                    var maxY = wins[0].atY + wins[0].sizeH
-
-                                    for (var i = 1; i < wins.length; ++i) {
-                                        var win = wins[i]
-                                        minX = Math.min(minX, win.atX)
-                                        minY = Math.min(minY, win.atY)
-                                        maxX = Math.max(maxX, win.atX + win.sizeW)
-                                        maxY = Math.max(maxY, win.atY + win.sizeH)
-                                    }
-
-                                    var spanX = Math.max(1, maxX - minX)
-                                    var spanY = Math.max(1, maxY - minY)
-
-                                    var groups = []
-                                    for (var j = 0; j < Math.min(wins.length, 8); ++j) {
-                                        var iw = wins[j]
-                                        var nx = Math.max(0, Math.min(1, (iw.atX - minX) / spanX))
-                                        var ny = Math.max(0, Math.min(1, (iw.atY - minY) / spanY))
-                                        var nw = Math.max(0.1, Math.min(1, iw.sizeW / spanX))
-                                        var nh = Math.max(0.1, Math.min(1, iw.sizeH / spanY))
-
-                                        var merged = false
-                                        for (var g = 0; g < groups.length; ++g) {
-                                            var cg = groups[g]
-                                            if (Math.abs(cg.x - nx) < 0.06 &&
-                                                Math.abs(cg.y - ny) < 0.06 &&
-                                                Math.abs(cg.w - nw) < 0.08 &&
-                                                Math.abs(cg.h - nh) < 0.08) {
-                                                cg.stackCount += 1
-                                                merged = true
-                                                break
-                                            }
-                                        }
-
-                                        if (!merged) {
-                                            groups.push({
-                                                appName: iw.appName,
-                                                x: nx,
-                                                y: ny,
-                                                w: nw,
-                                                h: nh,
-                                                stackCount: 1
-                                            })
-                                        }
-                                    }
-
-                                    layoutTiles = groups
-                                }
-
-                                result.push({
-                                    id: id,
-                                    name: String(id),
-                                    windows: wins,
-                                    layoutTiles: layoutTiles,
-                                    occupied: wins.length > 0,
-                                    extra: id === extraWorkspaceId
-                                })
-                            }
-                            return result.slice(0, 6)
-                        }
-                    }
-
-                    Item {
-                        id: workspacePanel
-                        anchors.fill: parent
-                        anchors.margins: 10
-
-                        Grid {
-                            id: workspaceGrid
-                            readonly property int itemCount: Math.max(1, Math.min(workspaceRepeater.count, 6))
-                            readonly property int usedColumns: workspaceStrip.isPortrait
-                                ? (itemCount <= 2 ? itemCount : 2)
-                                : (itemCount <= 3 ? itemCount : (itemCount === 4 ? 2 : 3))
-                            readonly property int rows: itemCount <= 3 ? 1 : 2
-                            property int cardWidth: Math.max(workspaceStrip.isPortrait ? 168 : 230, Math.floor((workspacePanel.width - ((usedColumns - 1) * spacing)) / usedColumns))
-                            property int cardHeight: workspaceStrip.cardHeightDynamic
-                            spacing: workspaceStrip.gridSpacing
-                            columns: usedColumns
-                            width: Math.min(workspacePanel.width, (usedColumns * cardWidth) + ((usedColumns - 1) * spacing))
-                            height: Math.min(workspacePanel.height, (rows * cardHeight) + ((rows - 1) * spacing))
-                            anchors.centerIn: parent
+                        Row {
+                            id: workspaceRow
+                            spacing: 18
+                            anchors.horizontalCenter: parent.horizontalCenter
 
                             Repeater {
-                                id: workspaceRepeater
-                                model: workspaceModel
+                                model: root.workspaceTargets.length
 
-                                delegate: Rectangle {
-                                    required property var modelData
-                                    property int workspaceId: modelData.id
-                                    property string workspaceName: modelData.name
-                                    property var workspaceWindows: modelData.windows || []
-                                    property var workspaceLayoutTiles: modelData.layoutTiles || []
-                                    property bool isExtra: modelData.extra || false
+                                delegate: Item {
+                                    readonly property var modelData: root.workspaceTargets[index]
 
-                                    width: Math.max(128, (workspaceGrid.width - (workspaceGrid.spacing * Math.max(workspaceGrid.columns - 1, 0))) / Math.max(workspaceGrid.columns, 1))
-                                    height: workspaceGrid.cardHeight
-                                    radius: 14
-                                    color: root.activeWorkspaceId === workspaceId ? "#AA2A4365" : (isExtra ? "#44333a46" : "#5524262a")
-                                    border.width: root.draggingTargetWorkspace === workspaceId ? 2 : 1
-                                    border.color: root.draggingTargetWorkspace === workspaceId ? "#FF77B8FF" : "#557f8ea3"
+                                    property int targetWorkspaceId: Number(modelData.id)
+                                    property string targetLabel: String(modelData.label)
+                                    property bool isNewTarget: Boolean(modelData.isNew)
+                                    property bool isActiveTarget: !isNewTarget && root.activeWorkspaceId === targetWorkspaceId
+                                    property bool isDropTarget: root.draggingTargetWorkspace === targetWorkspaceId
+                                    property bool isSourceTarget: root.draggingFromWorkspace === targetWorkspaceId
+                                    property bool isOccupied: Number(modelData.count || 0) > 0
 
-                                    Column {
-                                        anchors.fill: parent
-                                        anchors.margins: 12
-                                        spacing: 8
+                                    width: targetPill.width
+                                    height: targetPill.height
 
-                                        Row {
-                                            width: parent.width
-                                            spacing: 8
+                                    Rectangle {
+                                        id: targetPill
+                                        width: isDropTarget ? 84 : (isActiveTarget ? 48 : 46)
+                                        height: 46
+                                        radius: 23
+                                        color: isDropTarget
+                                            ? root.dmsPrimaryContainer
+                                            : isActiveTarget
+                                                ? root.dmsPrimaryContainer
+                                                : (isNewTarget
+                                                    ? root.withAlpha(root.dmsSurface, 0.30)
+                                                    : (isOccupied
+                                                        ? root.withAlpha(root.dmsSurfaceVariant, 0.86)
+                                                        : root.withAlpha(root.dmsSurface, 0.56)))
+                                        border.width: 1
+                                        border.color: isDropTarget
+                                            ? root.dmsPrimary
+                                            : isActiveTarget
+                                                ? root.withAlpha(root.dmsPrimary, 0.82)
+                                                : (isNewTarget
+                                                    ? root.withAlpha(root.dmsPrimary, 0.78)
+                                                    : (isOccupied
+                                                        ? root.withAlpha(root.dmsPrimary, 0.34)
+                                                        : root.withAlpha(root.dmsOutline, 0.44)))
 
-                                            Text {
-                                                text: "Workspace " + workspaceName
-                                                color: "white"
-                                                font.pixelSize: 14
-                                                font.bold: root.activeWorkspaceId === workspaceId
-                                            }
-
-                                            Text {
-                                                text: isExtra ? "+ new" : (workspaceWindows.length + " win")
-                                                color: "#b8d8ff"
-                                                font.pixelSize: 13
-                                            }
+                                        Behavior on width {
+                                            NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
                                         }
 
-                                        Rectangle {
-                                            width: parent.width
-                                            height: Math.max(58, parent.height - 30)
-                                            radius: 10
-                                            color: "#33000000"
-                                            border.width: 1
-                                            border.color: "#33556677"
+                                        Behavior on color {
+                                            ColorAnimation { duration: 150 }
+                                        }
 
-                                            Item {
-                                                anchors.fill: parent
-                                                anchors.margins: 8
-                                                clip: true
-
-                                                Repeater {
-                                                    model: workspaceLayoutTiles
-
-                                                    delegate: Rectangle {
-                                                        required property var modelData
-                                                        readonly property var tile: modelData || ({})
-                                                        x: Math.max(0, Math.round(tile.x * (parent.width - 4)))
-                                                        y: Math.max(0, Math.round(tile.y * (parent.height - 4)))
-                                                        width: Math.max(42, Math.round(tile.w * parent.width) - 5)
-                                                        height: Math.max(26, Math.round(tile.h * parent.height) - 5)
-                                                        radius: 10
-                                                        color: "#6E5E7A9A"
-                                                        border.width: 1
-                                                        border.color: "#77a2c5ef"
-
-                                                        Text {
-                                                            anchors.centerIn: parent
-                                                            text: (Number(tile.stackCount || 1) > 1)
-                                                                ? (String(tile.stackCount) + " stacked")
-                                                                : String(tile.appName || "?").slice(0, 10)
-                                                            color: "white"
-                                                            font.pixelSize: 10
-                                                            font.bold: true
-                                                            elide: Text.ElideRight
-                                                        }
-
-                                                        Rectangle {
-                                                            visible: Number(tile.stackCount || 1) > 1
-                                                            anchors.right: parent.right
-                                                            anchors.top: parent.top
-                                                            anchors.margins: 4
-                                                            width: 20
-                                                            height: 16
-                                                            radius: 8
-                                                            color: "#AA0E1A2D"
-                                                            border.width: 1
-                                                            border.color: "#88B6D7FF"
-
-                                                            Text {
-                                                                anchors.centerIn: parent
-                                                                text: String(tile.stackCount)
-                                                                color: "white"
-                                                                font.pixelSize: 9
-                                                                font.bold: true
-                                                            }
-                                                        }
-                                                    }
-                                                }
-
-                                                Text {
-                                                    visible: workspaceLayoutTiles.length === 0
-                                                    anchors.centerIn: parent
-                                                    text: isExtra ? "Drop here to create" : "No windows"
-                                                    color: "#8fa8c8"
-                                                    font.pixelSize: 12
-                                                }
-                                            }
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: targetLabel
+                                            color: isDropTarget
+                                                ? root.dmsOnPrimaryContainer
+                                                : isActiveTarget
+                                                    ? root.dmsOnPrimaryContainer
+                                                    : (isNewTarget
+                                                        ? root.dmsPrimary
+                                                        : (isOccupied
+                                                            ? root.dmsOnSurface
+                                                            : root.dmsMutedText))
+                                            font.pixelSize: 19
+                                            font.bold: isActiveTarget || isDropTarget
                                         }
                                     }
 
                                     MouseArea {
                                         anchors.fill: parent
-                                        onClicked: Hyprland.dispatch(`workspace ${parent.workspaceId}`)
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: root.switchWorkspace(targetWorkspaceId)
                                     }
 
                                     DropArea {
                                         anchors.fill: parent
-                                        onEntered: root.draggingTargetWorkspace = parent.workspaceId
+
+                                        onEntered: root.draggingTargetWorkspace = targetWorkspaceId
                                         onExited: {
-                                            if (root.draggingTargetWorkspace === parent.workspaceId) {
+                                            if (root.draggingTargetWorkspace === targetWorkspaceId)
                                                 root.draggingTargetWorkspace = -1
-                                            }
                                         }
                                         onDropped: {
                                             var source = drag.source
-                                            if (!source || !source.windowAddress) return
+                                            if (!source || !source.windowAddress)
+                                                return
                                             source.dropHandled = true
-                                            root.moveWindowToWorkspace(source.windowAddress, parent.workspaceId)
+                                            root.moveWindowToWorkspace(source.windowAddress, targetWorkspaceId)
+                                            if (isNewTarget)
+                                                root.switchWorkspace(targetWorkspaceId)
                                             root.draggingTargetWorkspace = -1
                                         }
                                     }
                                 }
                             }
+                        }
+
+                        Text {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            text: "Workspaces"
+                            color: root.withAlpha(root.dmsMutedText, 0.92)
+                            font.pixelSize: 12
                         }
                     }
                 }

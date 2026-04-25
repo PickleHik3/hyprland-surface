@@ -33,8 +33,8 @@ PluginComponent {
         return null;
     }
     readonly property bool isVariant: variantId !== ""
-    readonly property string actionKind: effectiveVariantData && effectiveVariantData.action ? effectiveVariantData.action : "menu"
-    readonly property string variantIcon: effectiveVariantData && effectiveVariantData.icon ? effectiveVariantData.icon : "widgets"
+    readonly property string actionKind: effectiveVariantData && effectiveVariantData.action ? effectiveVariantData.action : "recentApps"
+    readonly property string variantIcon: effectiveVariantData && effectiveVariantData.icon ? effectiveVariantData.icon : "square"
     readonly property string recentAppsPath: pluginData.recentAppsPath || "$HOME/.config/hypr/apps/qs-hyprview"
     readonly property string keyboardAutoScript: pluginData.keyboardAutoScript || "$HOME/.config/hypr/apps/wvkbd/scripts/auto-show-wvkbd.sh"
     readonly property string keyboardDisableScript: pluginData.keyboardDisableScript || "$HOME/.config/hypr/apps/wvkbd/scripts/disable-wvkbd.sh"
@@ -288,47 +288,17 @@ PluginComponent {
 
     horizontalBarPill: Component {
         Item {
-            implicitWidth: root.isVariant ? variantButton.width : groupedRow.implicitWidth
+            implicitWidth: variantButton.width
             implicitHeight: root.actionButtonSize
 
             ActionButton {
                 id: variantButton
-                visible: root.isVariant
                 buttonSize: root.actionButtonSize
                 iconName: root.actionKind === "recentApps" ? "square" : root.isKeyboardAction ? root.keyboardIconName() : root.actionKind === "back" ? "arrow_back_ios" : root.variantIcon
                 iconColor: root.actionKind === "recentApps" ? Theme.primary : root.isKeyboardAction ? (root.keyboardDisabled ? Theme.surfaceVariantText : Theme.primary) : Theme.surfaceText
                 backgroundColor: root.isKeyboardAction && !root.keyboardDisabled ? Theme.surfaceContainerLow : "transparent"
                 indicatorVisible: false
                 onClicked: root.runVariantAction()
-            }
-
-            Row {
-                id: groupedRow
-                visible: !root.isVariant
-                spacing: Theme.spacingXS
-
-                ActionButton {
-                    buttonSize: root.actionButtonSize
-                    iconName: "square"
-                    iconColor: Theme.primary
-                    onClicked: root.openRecentApps()
-                }
-
-                ActionButton {
-                    buttonSize: root.actionButtonSize
-                    iconName: root.keyboardIconName()
-                    iconColor: root.keyboardDisabled ? Theme.surfaceVariantText : Theme.primary
-                    backgroundColor: root.keyboardDisabled ? "transparent" : Theme.surfaceContainerLow
-                    indicatorVisible: false
-                    onClicked: root.keyboardButtonAction()
-                }
-
-                ActionButton {
-                    buttonSize: root.actionButtonSize
-                    iconName: "arrow_back_ios"
-                    iconColor: Theme.surfaceText
-                    onClicked: root.universalBack()
-                }
             }
         }
     }
@@ -336,46 +306,16 @@ PluginComponent {
     verticalBarPill: Component {
         Item {
             implicitWidth: root.actionButtonSize
-            implicitHeight: root.isVariant ? variantButton.height : groupedColumn.implicitHeight
+            implicitHeight: variantButton.height
 
             ActionButton {
                 id: variantButton
-                visible: root.isVariant
                 buttonSize: root.actionButtonSize
                 iconName: root.actionKind === "recentApps" ? "square" : root.isKeyboardAction ? root.keyboardIconName() : root.actionKind === "back" ? "arrow_back_ios" : root.variantIcon
                 iconColor: root.actionKind === "recentApps" ? Theme.primary : root.isKeyboardAction ? (root.keyboardDisabled ? Theme.surfaceVariantText : Theme.primary) : Theme.surfaceText
                 backgroundColor: root.isKeyboardAction && !root.keyboardDisabled ? Theme.surfaceContainerLow : "transparent"
                 indicatorVisible: false
                 onClicked: root.runVariantAction()
-            }
-
-            Column {
-                id: groupedColumn
-                visible: !root.isVariant
-                spacing: Theme.spacingXS
-
-                ActionButton {
-                    buttonSize: root.actionButtonSize
-                    iconName: "square"
-                    iconColor: Theme.primary
-                    onClicked: root.openRecentApps()
-                }
-
-                ActionButton {
-                    buttonSize: root.actionButtonSize
-                    iconName: root.keyboardIconName()
-                    iconColor: root.keyboardDisabled ? Theme.surfaceVariantText : Theme.primary
-                    backgroundColor: root.keyboardDisabled ? "transparent" : Theme.surfaceContainerLow
-                    indicatorVisible: false
-                    onClicked: root.keyboardButtonAction()
-                }
-
-                ActionButton {
-                    buttonSize: root.actionButtonSize
-                    iconName: "arrow_back_ios"
-                    iconColor: Theme.surfaceText
-                    onClicked: root.universalBack()
-                }
             }
         }
     }

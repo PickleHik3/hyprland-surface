@@ -27,7 +27,7 @@ PluginSettings {
 
     StyledText {
         width: parent.width
-        text: "Default widget variants are Recent Apps, Keyboard Toggle, and Back. After enabling the plugin, add those variants from DankBar settings as separate items."
+        text: "This plugin is intended to be added as separate DankBar items. Use the default variants for Recent Apps, Keyboard Toggle, and Back, then add only the ones you want from DankBar settings."
         font.pixelSize: Theme.fontSizeSmall
         color: Theme.surfaceVariantText
         wrapMode: Text.WordWrap
